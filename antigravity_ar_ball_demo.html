@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Antigravity AR Ball Demo</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- AR.js for A-Frame -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+      background: #000;
+    }
+
+    .hud {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      z-index: 9999;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 14px;
+      padding: 12px 14px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      line-height: 1.5;
+    }
+
+    .hud h1 {
+      margin: 0 0 6px 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .hud .small {
+      font-size: 13px;
+      opacity: 0.92;
+    }
+
+    .hint {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 9999;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 13px;
+      backdrop-filter: blur(6px);
+    }
+
+    .pulse-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 8px;
+      border-radius: 999px;
+      background: #7df9ff;
+      box-shadow: 0 0 14px #7df9ff;
+      animation: pulse 1.2s infinite ease-in-out;
+      vertical-align: middle;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.7; }
+      50% { transform: scale(1.35); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <h1><span class="pulse-dot"></span>Antigravity AR Ball</h1>
+    <div class="small">
+      將鏡頭對準 <b>Hiro Marker</b>，即可看到漂浮反重力球。<br>
+      點一下畫面可切換球體顏色。
+    </div>
+  </div>
+
+  <div class="hint">
+    建議：用手機 Chrome / Safari 開啟，允許相機權限；可直接用另一台螢幕顯示 Hiro Marker。
+  </div>
+
+  <a-scene
+    vr-mode-ui="enabled: false"
+    embedded
+    renderer="logarithmicDepthBuffer: true; colorManagement: true;"
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+
+    <a-assets>
+      <img id="floorTex" src="https://cdn.aframe.io/a-painter/images/floor.jpg" crossorigin="anonymous">
+    </a-assets>
+
+    <a-marker preset="hiro" id="hiroMarker">
+
+      <!-- base platform -->
+      <a-cylinder position="0 0 0" radius="1.0" height="0.08" color="#0f172a"
+                  material="metalness:0.4; roughness:0.25; opacity:0.85"></a-cylinder>
+
+      <!-- glowing platform ring -->
+      <a-torus position="0 0.07 0" radius="0.75" radius-tubular="0.03"
+               color="#7df9ff"
+               material="emissive:#7df9ff; emissiveIntensity:1.2; opacity:0.95"
+               animation="property: rotation; to: 0 360 0; loop: true; dur: 4500; easing: linear">
+      </a-torus>
+
+      <a-torus position="0 0.11 0" radius="0.48" radius-tubular="0.015"
+               color="#c084fc"
+               material="emissive:#c084fc; emissiveIntensity:1.3; opacity:0.9"
+               animation="property: rotation; to: 0 -360 0; loop: true; dur: 2500; easing: linear">
+      </a-torus>
+
+      <!-- antigravity ball -->
+      <a-sphere id="ball"
+                position="0 0.9 0"
+                radius="0.26"
+                color="#7df9ff"
+                material="shader: standard; metalness: 0.25; roughness: 0.15; emissive: #7df9ff; emissiveIntensity: 0.9"
+                animation__float="property: position; dir: alternate; dur: 1800; loop: true; to: 0 1.15 0; easing: easeInOutSine"
+                animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 3200; easing: linear">
+      </a-sphere>
+
+      <!-- ball aura -->
+      <a-sphere position="0 0.9 0"
+                radius="0.34"
+                color="#7df9ff"
+                material="transparent:true; opacity:0.12; emissive:#7df9ff; emissiveIntensity:1.1"
+                animation="property: scale; dir: alternate; dur: 900; loop: true; to: 1.18 1.18 1.18; easing: easeInOutQuad">
+      </a-sphere>
+
+      <!-- vertical beam -->
+      <a-cylinder position="0 0.55 0" radius="0.05" height="1.0"
+                  color="#7df9ff"
+                  material="transparent:true; opacity:0.14; emissive:#7df9ff; emissiveIntensity:1.0">
+      </a-cylinder>
+
+      <!-- orbiting satellites -->
+      <a-entity position="0 0.98 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 2000; easing: linear">
+        <a-sphere position="0.42 0 0" radius="0.035" color="#ffffff"
+                  material="emissive:#ffffff; emissiveIntensity:1.0"></a-sphere>
+      </a-entity>
+
+      <a-entity position="0 0.98 0" animation="property: rotation; to: 360 0 360; loop: true; dur: 2800; easing: linear">
+        <a-sphere position="-0.32 0.08 0.18" radius="0.026" color="#c084fc"
+                  material="emissive:#c084fc; emissiveIntensity:1.0"></a-sphere>
+      </a-entity>
+
+      <!-- floating label -->
+      <a-text value="ANTI-GRAVITY FIELD"
+              position="-0.72 1.52 0"
+              rotation="-90 0 0"
+              align="center"
+              color="#ffffff"
+              width="2.8"
+              shader="msdf">
+      </a-text>
+
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    const colors = [
+      { base: '#7df9ff', accent: '#7df9ff' },
+      { base: '#c084fc', accent: '#c084fc' },
+      { base: '#22c55e', accent: '#22c55e' },
+      { base: '#f59e0b', accent: '#f59e0b' }
+    ];
+
+    let colorIndex = 0;
+
+    function setBallColor() {
+      const ball = document.querySelector('#ball');
+      const aura = document.querySelectorAll('a-sphere')[1];
+      const torusList = document.querySelectorAll('a-torus');
+      const beam = document.querySelector('a-cylinder[position="0 0.55 0"]');
+      const c = colors[colorIndex];
+
+      if (ball) {
+        ball.setAttribute('color', c.base);
+        ball.setAttribute('material', `shader: standard; metalness: 0.25; roughness: 0.15; emissive: ${c.accent}; emissiveIntensity: 0.9`);
+      }
+      if (aura) {
+        aura.setAttribute('color', c.base);
+        aura.setAttribute('material', `transparent:true; opacity:0.12; emissive:${c.accent}; emissiveIntensity:1.1`);
+      }
+      torusList.forEach((t, idx) => {
+        const tone = idx === 0 ? c.base : '#ffffff';
+        t.setAttribute('color', tone);
+        t.setAttribute('material', `emissive:${tone}; emissiveIntensity:1.2; opacity:0.95`);
+      });
+      if (beam) {
+        beam.setAttribute('color', c.base);
+        beam.setAttribute('material', `transparent:true; opacity:0.14; emissive:${c.accent}; emissiveIntensity:1.0`);
+      }
+    }
+
+    window.addEventListener('click', () => {
+      colorIndex = (colorIndex + 1) % colors.length;
+      setBallColor();
+    });
+
+    window.addEventListener('load', setBallColor);
+  </script>
+</body>
+</html>
