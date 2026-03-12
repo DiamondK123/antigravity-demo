@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Antigravity Demo B - Stable Camera Ball</title>
+  <style>
+    :root{
+      --hud-bg: rgba(5, 10, 20, 0.45);
+      --hud-border: rgba(255,255,255,0.16);
+      --text: #ffffff;
+      --accent: #7df9ff;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+    }
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+    video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+      transform: scaleX(-1);
+    }
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .hud {
+      position: absolute;
+      z-index: 20;
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      color: var(--text);
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.30);
+    }
+    .hud h1 {
+      margin: 0 0 6px 0;
+      font-size: 18px;
+      letter-spacing: 0.2px;
+    }
+    .hud p {
+      margin: 4px 0;
+      font-size: 13px;
+      line-height: 1.45;
+      opacity: 0.95;
+    }
+    .controls {
+      position: absolute;
+      z-index: 20;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 1px solid var(--hud-border);
+      background: rgba(10, 18, 30, 0.60);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      backdrop-filter: blur(8px);
+      cursor: pointer;
+    }
+    .tag {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: rgba(125,249,255,0.16);
+      border: 1px solid rgba(125,249,255,0.25);
+      color: #dffcff;
+      vertical-align: middle;
+    }
+    #status {
+      color: #dffcff;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <video id="camera" playsinline autoplay muted></video>
+  <canvas id="fx"></canvas>
+
+  <div class="hud">
+    <h1>Antigravity Demo B <span class="tag">穩定版</span></h1>
+    <p>這版不需要 Hiro Marker。允許相機後，反重力球會直接出現在畫面中央。</p>
+    <p>操作：拖曳可移動球；雙擊切換顏色；按下「Burst」可觸發能量爆發。</p>
+    <p>狀態：<span id="status">等待相機啟動</span></p>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">啟動相機</button>
+    <button id="burstBtn">Burst</button>
+    <button id="colorBtn">換色</button>
+    <button id="gravityBtn">切換反重力</button>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('camera');
+const canvas = document.getElementById('fx');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+const burstBtn = document.getElementById('burstBtn');
+const colorBtn = document.getElementById('colorBtn');
+const gravityBtn = document.getElementById('gravityBtn');
+
+let w = 0, h = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
+let lastTime = 0;
+let particles = [];
+let drag = false;
+let antiGravity = true;
+let pulse = 0;
+let burst = 0;
+
+const palette = [
+  { core:'#7df9ff', glow:'125,249,255' },
+  { core:'#c084fc', glow:'192,132,252' },
+  { core:'#22c55e', glow:'34,197,94' },
+  { core:'#f59e0b', glow:'245,158,11' }
+];
+let paletteIndex = 0;
+
+const ball = {
+  x: 0,
+  y: 0,
+  r: 48,
+  vx: 0,
+  vy: 0,
+  floatTime: 0
+};
+
+function resize() {
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  w = window.innerWidth;
+  h = window.innerHeight;
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!ball.x && !ball.y) {
+    ball.x = w * 0.5;
+    ball.y = h * 0.58;
+  }
+}
+window.addEventListener('resize', resize);
+resize();
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    setStatus('相機已啟動，反重力球已上線');
+  } catch (err) {
+    console.error(err);
+    setStatus('相機啟動失敗，改用黑色背景展示');
+  }
+}
+startBtn.addEventListener('click', startCamera);
+
+function createParticle(x, y, count = 18) {
+  const p = palette[paletteIndex];
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      life: 20 + Math.random() * 24,
+      maxLife: 44,
+      size: 2 + Math.random() * 3,
+      glow: p.glow
+    });
+  }
+}
+
+function triggerBurst() {
+  burst = 20;
+  createParticle(ball.x, ball.y, 42);
+}
+burstBtn.addEventListener('click', triggerBurst);
+
+function switchColor() {
+  paletteIndex = (paletteIndex + 1) % palette.length;
+  createParticle(ball.x, ball.y, 24);
+}
+colorBtn.addEventListener('click', switchColor);
+
+gravityBtn.addEventListener('click', () => {
+  antiGravity = !antiGravity;
+  createParticle(ball.x, ball.y, 28);
+  setStatus(antiGravity ? '反重力模式啟用' : '漂浮穩定模式啟用');
+});
+
+function drawGrid() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < w; i += 48) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, h);
+    ctx.stroke();
+  }
+  for (let j = 0; j < h; j += 48) {
+    ctx.beginPath();
+    ctx.moveTo(0, j);
+    ctx.lineTo(w, j);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHUDReticle() {
+  ctx.save();
+  ctx.translate(ball.x, ball.y);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+  ctx.arc(0, 0, ball.r + 26 + Math.sin(pulse) * 4, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(-ball.r - 42, 0);
+  ctx.lineTo(-ball.r - 18, 0);
+  ctx.moveTo(ball.r + 18, 0);
+  ctx.lineTo(ball.r + 42, 0);
+  ctx.moveTo(0, -ball.r - 42);
+  ctx.lineTo(0, -ball.r - 18);
+  ctx.moveTo(0, ball.r + 18);
+  ctx.lineTo(0, ball.r + 42);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawBall() {
+  const p = palette[paletteIndex];
+  const glowAlpha = 0.18 + (Math.sin(pulse * 2) + 1) * 0.05;
+
+  // beam
+  ctx.save();
+  const beamGrad = ctx.createLinearGradient(ball.x, ball.y - 180, ball.x, ball.y + 90);
+  beamGrad.addColorStop(0, `rgba(${p.glow},0.00)`);
+  beamGrad.addColorStop(0.5, `rgba(${p.glow},0.12)`);
+  beamGrad.addColorStop(1, `rgba(${p.glow},0.00)`);
+  ctx.fillStyle = beamGrad;
+  ctx.beginPath();
+  ctx.ellipse(ball.x, ball.y - 10, 26, 170, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // aura
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r + 18 + Math.sin(pulse * 3) * 3, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(${p.glow},${glowAlpha})`;
+  ctx.fill();
+  ctx.restore();
+
+  // ring 1
+  ctx.save();
+  ctx.translate(ball.x, ball.y);
+  ctx.rotate(pulse);
+  ctx.strokeStyle = `rgba(${p.glow},0.9)`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, ball.r + 10, 12, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // ring 2
+  ctx.save();
+  ctx.translate(ball.x, ball.y);
+  ctx.rotate(-pulse * 1.4);
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 16, ball.r + 8, Math.PI / 5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // core gradient
+  const grad = ctx.createRadialGradient(
+    ball.x - ball.r * 0.35, ball.y - ball.r * 0.4, 4,
+    ball.x, ball.y, ball.r
+  );
+  grad.addColorStop(0, 'rgba(255,255,255,0.98)');
+  grad.addColorStop(0.22, p.core);
+  grad.addColorStop(0.75, `rgba(${p.glow},0.85)`);
+  grad.addColorStop(1, `rgba(${p.glow},0.20)`);
+
+  ctx.save();
+  ctx.shadowBlur = 30 + burst;
+  ctx.shadowColor = p.core;
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // highlight
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath();
+  ctx.ellipse(ball.x - ball.r * 0.25, ball.y - ball.r * 0.3, ball.r * 0.22, ball.r * 0.12, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  drawHUDReticle();
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.985;
+    p.vy *= 0.985;
+    p.life -= 1;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    const alpha = p.life / p.maxLife;
+    ctx.save();
+    ctx.fillStyle = `rgba(${p.glow},${Math.max(0, alpha * 0.8)})`;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = `rgba(${p.glow},1)`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function animate(ts) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(32, ts - lastTime || 16) / 16.666;
+  lastTime = ts;
+  pulse += 0.02 * dt;
+  if (burst > 0) burst -= 0.7 * dt;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // subtle overlay
+  ctx.fillStyle = 'rgba(0, 8, 20, 0.12)';
+  ctx.fillRect(0, 0, w, h);
+  drawGrid();
+
+  if (!drag) {
+    ball.floatTime += 0.025 * dt;
+    ball.vy += antiGravity ? -0.028 * dt : -0.012 * dt;
+    ball.vy += Math.sin(ball.floatTime) * 0.018 * dt;
+    ball.vx += Math.cos(ball.floatTime * 0.7) * 0.01 * dt;
+  }
+
+  // damping and gentle centering
+  const targetX = w * 0.5;
+  const targetY = h * 0.58;
+  ball.vx += (targetX - ball.x) * 0.0009 * dt;
+  ball.vy += (targetY - ball.y) * 0.0005 * dt;
+  ball.vx *= 0.985;
+  ball.vy *= 0.985;
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+
+  // bounds
+  const margin = ball.r + 18;
+  if (ball.x < margin) { ball.x = margin; ball.vx *= -0.3; }
+  if (ball.x > w - margin) { ball.x = w - margin; ball.vx *= -0.3; }
+  if (ball.y < margin + 50) { ball.y = margin + 50; ball.vy *= -0.3; }
+  if (ball.y > h - margin - 50) { ball.y = h - margin - 50; ball.vy *= -0.3; }
+
+  if (Math.random() < 0.2) {
+    createParticle(ball.x + (Math.random() - 0.5) * 20, ball.y + ball.r * 0.2, 1);
+  }
+
+  drawBall();
+  updateParticles();
+}
+requestAnimationFrame(animate);
+
+function getPoint(e) {
+  if (e.touches && e.touches[0]) {
+    return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  return { x: e.clientX, y: e.clientY };
+}
+
+function pointerDown(e) {
+  const p = getPoint(e);
+  const dx = p.x - ball.x, dy = p.y - ball.y;
+  if (Math.hypot(dx, dy) <= ball.r + 28) {
+    drag = true;
+    ball.vx = 0;
+    ball.vy = 0;
+    e.preventDefault();
+  }
+}
+function pointerMove(e) {
+  if (!drag) return;
+  const p = getPoint(e);
+  ball.x = p.x;
+  ball.y = p.y;
+  createParticle(ball.x, ball.y, 2);
+  e.preventDefault();
+}
+function pointerUp() {
+  drag = false;
+}
+canvas.addEventListener('mousedown', pointerDown);
+canvas.addEventListener('mousemove', pointerMove);
+window.addEventListener('mouseup', pointerUp);
+
+canvas.addEventListener('touchstart', pointerDown, { passive: false });
+canvas.addEventListener('touchmove', pointerMove, { passive: false });
+window.addEventListener('touchend', pointerUp);
+
+let lastTap = 0;
+canvas.addEventListener('touchend', () => {
+  const now = Date.now();
+  if (now - lastTap < 320) switchColor();
+  lastTap = now;
+});
+canvas.addEventListener('dblclick', switchColor);
+
+setStatus('請按「啟動相機」開始展示');
+</script>
+</body>
+</html>
