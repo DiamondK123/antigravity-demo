@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cute Pet Camera Demo</title>
+  <style>
+    :root{
+      --panel-bg: rgba(15,18,32,.50);
+      --panel-border: rgba(255,255,255,.18);
+      --text: #fff;
+      --accent: #ffd76a;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+    }
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+    #camera {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+      transform: scaleX(-1);
+    }
+    #fx {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .hud {
+      position: absolute;
+      z-index: 20;
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      padding: 12px 14px;
+      color: var(--text);
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 28px rgba(0,0,0,.30);
+    }
+    .hud h1 {
+      margin: 0 0 6px 0;
+      font-size: 18px;
+    }
+    .hud p {
+      margin: 4px 0;
+      font-size: 13px;
+      line-height: 1.45;
+      opacity: 0.96;
+    }
+    .tag {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: rgba(255,215,106,.16);
+      color: #fff2c4;
+      border: 1px solid rgba(255,215,106,.28);
+      vertical-align: middle;
+    }
+    .controls {
+      position: absolute;
+      z-index: 20;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 1px solid var(--panel-border);
+      background: rgba(15,18,32,.60);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      backdrop-filter: blur(8px);
+      cursor: pointer;
+    }
+    #status {
+      font-weight: 700;
+      color: #ffe9a7;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <video id="camera" playsinline autoplay muted></video>
+  <canvas id="fx"></canvas>
+
+  <div class="hud">
+    <h1>可愛寵物相機 Demo <span class="tag">Cute Pet</span></h1>
+    <p>允許相機後，畫面裡會出現一隻會跳跳跳的小寵物。</p>
+    <p>操作：拖曳可移動寵物；點「換寵物」切換貓咪／兔兔／小雞；點畫面會灑出愛心與星星。</p>
+    <p>狀態：<span id="status">請按下「啟動相機」</span></p>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">啟動相機</button>
+    <button id="petBtn">換寵物</button>
+    <button id="jumpBtn">跳一下</button>
+    <button id="sparkBtn">灑特效</button>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('camera');
+const canvas = document.getElementById('fx');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+const petBtn = document.getElementById('petBtn');
+const jumpBtn = document.getElementById('jumpBtn');
+const sparkBtn = document.getElementById('sparkBtn');
+
+let w = 0, h = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
+let lastTime = 0;
+let particles = [];
+let drag = false;
+let dragOffsetX = 0, dragOffsetY = 0;
+
+const pets = [
+  {
+    name: '貓咪',
+    body: '#f8c78c',
+    face: '#fff6ea',
+    ear: '#f4a8a8',
+    accent: '#ff9db6'
+  },
+  {
+    name: '兔兔',
+    body: '#f2f2f7',
+    face: '#fff',
+    ear: '#ffbfd1',
+    accent: '#bfa7ff'
+  },
+  {
+    name: '小雞',
+    body: '#ffe066',
+    face: '#fff7c7',
+    ear: '#ffb347',
+    accent: '#ffd166'
+  }
+];
+let petIndex = 0;
+
+const pet = {
+  x: 0,
+  y: 0,
+  groundY: 0,
+  scale: 1,
+  vy: 0,
+  jumpPower: -12,
+  gravity: 0.65,
+  bouncing: true,
+  time: 0
+};
+
+function resize() {
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  w = window.innerWidth;
+  h = window.innerHeight;
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  pet.groundY = h * 0.74;
+  if (!pet.x && !pet.y) {
+    pet.x = w * 0.5;
+    pet.y = pet.groundY;
+  }
+}
+window.addEventListener('resize', resize);
+resize();
+
+function setStatus(msg){
+  statusEl.textContent = msg;
+}
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    setStatus('相機已啟動，' + pets[petIndex].name + ' 已經開始跳跳跳');
+  } catch (err) {
+    console.error(err);
+    setStatus('相機啟動失敗，先用黑色背景展示寵物');
+  }
+}
+startBtn.addEventListener('click', startCamera);
+
+function emitParticles(x, y, count = 16) {
+  const emojis = ['❤','★','✨','♡'];
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 1.5,
+      life: 28 + Math.random() * 18,
+      maxLife: 46,
+      size: 14 + Math.random() * 10,
+      text: emojis[Math.floor(Math.random() * emojis.length)],
+      rot: (Math.random() - .5) * 0.3
+    });
+  }
+}
+
+function cyclePet() {
+  petIndex = (petIndex + 1) % pets.length;
+  emitParticles(pet.x, pet.y - 40, 20);
+  setStatus('已切換成 ' + pets[petIndex].name);
+}
+petBtn.addEventListener('click', cyclePet);
+
+function forceJump() {
+  pet.vy = pet.jumpPower - Math.random() * 2;
+  emitParticles(pet.x, pet.y - 10, 18);
+}
+jumpBtn.addEventListener('click', forceJump);
+sparkBtn.addEventListener('click', () => emitParticles(pet.x, pet.y - 30, 26));
+
+function drawShadow() {
+  const jumpHeight = Math.max(0, pet.groundY - pet.y);
+  const width = 84 - jumpHeight * 0.12;
+  const alpha = Math.max(0.10, 0.24 - jumpHeight * 0.0015);
+  ctx.save();
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  ctx.beginPath();
+  ctx.ellipse(pet.x, pet.groundY + 42, Math.max(22, width), 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFace(c) {
+  const x = pet.x, y = pet.y;
+  ctx.save();
+  ctx.translate(x, y);
+
+  const bob = Math.sin(pet.time * 8) * 2;
+  ctx.translate(0, bob);
+
+  if (pets[petIndex].name === '兔兔') {
+    // ears
+    ctx.fillStyle = c.body;
+    roundRect(-30, -98, 22, 52, 12);
+    roundRect(8, -98, 22, 52, 12);
+    ctx.fill();
+    ctx.fillStyle = c.ear;
+    roundRect(-24, -90, 10, 34, 8);
+    roundRect(14, -90, 10, 34, 8);
+    ctx.fill();
+  }
+
+  if (pets[petIndex].name === '貓咪') {
+    // ears
+    ctx.fillStyle = c.body;
+    triangle(-36, -42, -14, -92, -4, -44);
+    triangle(36, -42, 14, -92, 4, -44);
+    ctx.fill();
+    ctx.fillStyle = c.ear;
+    triangle(-28, -46, -14, -76, -6, -46);
+    triangle(28, -46, 14, -76, 6, -46);
+    ctx.fill();
+  }
+
+  // body
+  ctx.fillStyle = c.body;
+  ctx.beginPath();
+  ctx.ellipse(0, 22, 52, 46, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // head
+  ctx.fillStyle = c.body;
+  ctx.beginPath();
+  ctx.arc(0, -18, 46, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (pets[petIndex].name === '小雞') {
+    ctx.fillStyle = c.body;
+    ctx.beginPath();
+    ctx.arc(0, -18, 48, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // tummy/face patch
+  ctx.fillStyle = c.face;
+  ctx.beginPath();
+  ctx.ellipse(0, -6, 28, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0, 24, 24, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // cheeks
+  ctx.fillStyle = 'rgba(255,170,190,.75)';
+  ctx.beginPath(); ctx.arc(-20, -6, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(20, -6, 6, 0, Math.PI * 2); ctx.fill();
+
+  // eyes
+  ctx.fillStyle = '#2c2c3a';
+  ctx.beginPath(); ctx.arc(-14, -12, 4.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(14, -12, 4.5, 0, Math.PI * 2); ctx.fill();
+
+  // eye shine
+  ctx.fillStyle = 'rgba(255,255,255,.85)';
+  ctx.beginPath(); ctx.arc(-12, -14, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(16, -14, 1.5, 0, Math.PI * 2); ctx.fill();
+
+  // mouth / nose
+  if (pets[petIndex].name === '小雞') {
+    ctx.fillStyle = c.ear;
+    triangle(0, -2, -8, 4, 8, 4);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = '#69454d';
+    ctx.beginPath();
+    ctx.arc(0, -2, 3.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#69454d';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.quadraticCurveTo(-5, 8, -10, 5);
+    ctx.moveTo(0, 2);
+    ctx.quadraticCurveTo(5, 8, 10, 5);
+    ctx.stroke();
+  }
+
+  // paws
+  ctx.fillStyle = c.face;
+  ctx.beginPath(); ctx.ellipse(-18, 52, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(18, 52, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
+
+  // tiny tail
+  if (pets[petIndex].name === '貓咪') {
+    ctx.strokeStyle = c.body;
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(42, 28);
+    ctx.quadraticCurveTo(72, 0, 60, -34);
+    ctx.stroke();
+  }
+
+  // floating heart
+  ctx.font = '20px Arial';
+  ctx.fillText('❤', 42, -54 + Math.sin(pet.time * 6) * 3);
+
+  ctx.restore();
+}
+
+function roundRect(x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+}
+function triangle(x1, y1, x2, y2, x3, y3) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x3, y3);
+  ctx.closePath();
+}
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.04;
+    p.life -= 1;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    const alpha = p.life / p.maxLife;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.font = `${p.size}px Arial`;
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+}
+function drawFloorHint() {
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, h * 0.65, 0, h);
+  grad.addColorStop(0, 'rgba(255,255,255,0.00)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.08)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, h * 0.65, w, h * 0.35);
+
+  ctx.strokeStyle = 'rgba(255,255,255,.10)';
+  ctx.lineWidth = 1;
+  for (let i = -w; i < w * 2; i += 38) {
+    ctx.beginPath();
+    ctx.moveTo(i, h);
+    ctx.lineTo(w * 0.5 + (i - w * 0.5) * 0.18, h * 0.70);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function animate(ts) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(32, ts - lastTime || 16) / 16.666;
+  lastTime = ts;
+  pet.time += 0.016 * dt;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(12,14,22,.08)';
+  ctx.fillRect(0, 0, w, h);
+  drawFloorHint();
+
+  if (!drag && pet.bouncing) {
+    pet.vy += pet.gravity * dt;
+    pet.y += pet.vy * dt;
+    if (pet.y >= pet.groundY) {
+      pet.y = pet.groundY;
+      pet.vy = pet.jumpPower + Math.random() * -1.2;
+      emitParticles(pet.x, pet.y + 18, 8);
+    }
+  }
+
+  drawShadow();
+  drawFace(pets[petIndex]);
+  updateParticles();
+}
+requestAnimationFrame(animate);
+
+function getPoint(e) {
+  if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+function pointerDown(e) {
+  const p = getPoint(e);
+  const dx = p.x - pet.x;
+  const dy = p.y - (pet.y - 10);
+  if (Math.hypot(dx, dy) < 80) {
+    drag = true;
+    dragOffsetX = dx;
+    dragOffsetY = dy;
+    pet.vy = 0;
+    e.preventDefault();
+  } else {
+    emitParticles(p.x, p.y, 18);
+  }
+}
+function pointerMove(e) {
+  if (!drag) return;
+  const p = getPoint(e);
+  pet.x = p.x - dragOffsetX;
+  pet.y = Math.min(pet.groundY, p.y - dragOffsetY);
+  e.preventDefault();
+}
+function pointerUp() {
+  if (drag) {
+    drag = false;
+    pet.vy = pet.jumpPower * 0.85;
+  }
+}
+canvas.addEventListener('mousedown', pointerDown);
+canvas.addEventListener('mousemove', pointerMove);
+window.addEventListener('mouseup', pointerUp);
+canvas.addEventListener('touchstart', pointerDown, { passive:false });
+canvas.addEventListener('touchmove', pointerMove, { passive:false });
+window.addEventListener('touchend', pointerUp);
+
+canvas.addEventListener('click', (e) => {
+  const p = getPoint(e);
+  emitParticles(p.x, p.y, 16);
+});
+
+setStatus('請按下「啟動相機」開始');
+</script>
+</body>
+</html>
