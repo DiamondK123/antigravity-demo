@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Antigravity Duck Interactive Demo</title>
+  <style>
+    :root{
+      --panel-bg: rgba(8,12,24,.45);
+      --panel-border: rgba(255,255,255,.16);
+      --text: #fff;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      margin:0; width:100%; height:100%; overflow:hidden; background:#000;
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+    }
+    #app{ position:relative; width:100%; height:100%; overflow:hidden; background:#000; }
+    #camera{
+      position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+      background:#000; transform:scaleX(-1);
+    }
+    #fx{ position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+    .hud{
+      position:absolute; z-index:20; left:12px; right:12px; top:12px;
+      padding:12px 14px; color:var(--text); background:var(--panel-bg);
+      border:1px solid var(--panel-border); border-radius:18px; backdrop-filter:blur(12px);
+      box-shadow:0 14px 32px rgba(0,0,0,.34);
+    }
+    .hud h1{ margin:0 0 6px 0; font-size:18px; }
+    .hud p{ margin:4px 0; font-size:13px; line-height:1.45; opacity:.96; }
+    .tag{
+      display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px;
+      font-size:11px; background:rgba(255,211,77,.16); color:#fff3b0;
+      border:1px solid rgba(255,211,77,.24); vertical-align:middle;
+    }
+    .stats{
+      display:grid; grid-template-columns: 80px 1fr 42px; gap:6px 8px; align-items:center;
+      margin-top:8px;
+    }
+    .stats .label{ font-size:12px; opacity:.9; }
+    .bar{
+      height:8px; border-radius:999px; background:rgba(255,255,255,.12); overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .fill{ height:100%; border-radius:999px; }
+    .v{ font-size:12px; text-align:right; color:#dbeeff; }
+    .controls{
+      position:absolute; z-index:20; left:12px; right:12px; bottom:12px;
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    button{
+      border:1px solid var(--panel-border); background:rgba(10,16,28,.62); color:#fff;
+      padding:10px 14px; border-radius:14px; font-size:14px; backdrop-filter:blur(8px); cursor:pointer;
+    }
+    #status{ font-weight:700; color:#fff2a8; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <video id="camera" playsinline autoplay muted></video>
+  <canvas id="fx"></canvas>
+
+  <div class="hud">
+    <h1>Antigravity Duck Interactive <span class="tag">鴨鴨配音版</span></h1>
+    <p>這版改成可愛鴨鴨，並加入簡單配音與音效。每個主要按鈕按下去都會有鴨鴨語音反應。</p>
+    <p>狀態：<span id="status">請按下「啟動相機」</span></p>
+
+    <div class="stats">
+      <div class="label">心情</div>
+      <div class="bar"><div id="moodBar" class="fill" style="width:80%; background:#ff8fab;"></div></div>
+      <div id="moodVal" class="v">80</div>
+
+      <div class="label">飽食</div>
+      <div class="bar"><div id="foodBar" class="fill" style="width:72%; background:#ffd166;"></div></div>
+      <div id="foodVal" class="v">72</div>
+
+      <div class="label">能量</div>
+      <div class="bar"><div id="energyBar" class="fill" style="width:78%; background:#7df9ff;"></div></div>
+      <div id="energyVal" class="v">78</div>
+
+      <div class="label">親密度</div>
+      <div class="bar"><div id="bondBar" class="fill" style="width:24%; background:#c084fc;"></div></div>
+      <div id="bondVal" class="v">24</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">啟動相機</button>
+    <button id="feedBtn">餵食</button>
+    <button id="petBtn">摸摸牠</button>
+    <button id="playBtn">陪牠玩</button>
+    <button id="modeBtn">切模式</button>
+    <button id="colorBtn">換色</button>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('camera');
+const canvas = document.getElementById('fx');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+const startBtn = document.getElementById('startBtn');
+const feedBtn = document.getElementById('feedBtn');
+const petBtn = document.getElementById('petBtn');
+const playBtn = document.getElementById('playBtn');
+const modeBtn = document.getElementById('modeBtn');
+const colorBtn = document.getElementById('colorBtn');
+
+const moodBar = document.getElementById('moodBar');
+const foodBar = document.getElementById('foodBar');
+const energyBar = document.getElementById('energyBar');
+const bondBar = document.getElementById('bondBar');
+const moodVal = document.getElementById('moodVal');
+const foodVal = document.getElementById('foodVal');
+const energyVal = document.getElementById('energyVal');
+const bondVal = document.getElementById('bondVal');
+
+let w=0,h=0,dpr=Math.max(1,window.devicePixelRatio||1),lastTime=0;
+let stars=[], particles=[], rings=[], floatingFoods=[];
+let drag=false, dragDX=0, dragDY=0;
+let audioCtx = null;
+let pointer={x:0,y:0,active:false};
+
+const palettes = [
+  {body:'#ffe066', wing:'#ffd23f', accent:'#ff9f1c', glow1:'255,224,102', glow2:'255,159,28'},
+  {body:'#fff3b0', wing:'#ffe08a', accent:'#ff8fab', glow1:'255,243,176', glow2:'255,143,171'},
+  {body:'#ffd670', wing:'#ffcb52', accent:'#7df9ff', glow1:'255,214,112', glow2:'125,249,255'},
+  {body:'#f9e769', wing:'#f7d04b', accent:'#c084fc', glow1:'249,231,105', glow2:'192,132,252'}
+];
+let paletteIndex = 0;
+
+const pet = {
+  x:0,y:0, baseX:0, baseY:0, vx:0, vy:0, t:0, bobT:0, auraSpin:0,
+  targetX:0,targetY:0, burstPower:0, blinkT:0, blink:false,
+  name:'Ducky', mood:80, food:72, energy:78, bond:24,
+  emotion:'好奇', mode:0, eatTimer:0, playTimer:0, petTimer:0, flapT:0
+};
+
+function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+
+function ensureAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function beep(freq=440, duration=0.12, type='sine', volume=0.04, startOffset=0){
+  ensureAudio();
+  const now = audioCtx.currentTime + startOffset;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + duration + 0.03);
+}
+
+function quackSound(){
+  beep(520, 0.08, 'square', 0.03, 0);
+  beep(420, 0.12, 'square', 0.025, 0.04);
+}
+
+function feedSound(){
+  beep(660, 0.07, 'triangle', 0.03, 0);
+  beep(880, 0.09, 'triangle', 0.028, 0.05);
+  beep(1100, 0.11, 'triangle', 0.024, 0.11);
+}
+
+function petSound(){
+  beep(520, 0.08, 'sine', 0.03, 0);
+  beep(620, 0.08, 'sine', 0.028, 0.06);
+  beep(720, 0.12, 'sine', 0.024, 0.12);
+}
+
+function playSound(){
+  beep(480, 0.08, 'square', 0.028, 0);
+  beep(640, 0.08, 'square', 0.028, 0.05);
+  beep(860, 0.08, 'square', 0.025, 0.10);
+  beep(1020, 0.10, 'square', 0.022, 0.15);
+}
+
+function modeSound(){
+  beep(380, 0.07, 'sawtooth', 0.024, 0);
+  beep(520, 0.07, 'sawtooth', 0.024, 0.06);
+  beep(760, 0.10, 'sawtooth', 0.022, 0.12);
+}
+
+function colorSound(){
+  beep(700, 0.06, 'triangle', 0.02, 0);
+  beep(900, 0.06, 'triangle', 0.02, 0.05);
+}
+
+function speak(text, rate=1.1, pitch=1.7){
+  if(!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-TW';
+  u.rate = rate;
+  u.pitch = pitch;
+  u.volume = 0.9;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+function voiceStart(){
+  quackSound();
+  speak('小鴨鴨來了，我準備好了。', 1.06, 1.8);
+}
+function voiceFeed(){
+  feedSound();
+  speak('謝謝餵我，我最愛吃了。', 1.12, 1.9);
+}
+function voicePet(){
+  petSound();
+  speak('好舒服喔，再摸摸我。', 1.15, 1.95);
+}
+function voicePlay(){
+  playSound();
+  speak('耶，我們一起玩吧。', 1.13, 1.85);
+}
+function voiceMode(){
+  modeSound();
+  speak('好的，我換個反重力模式。', 1.08, 1.75);
+}
+function voiceColor(){
+  colorSound();
+  speak('我換新顏色了，可愛嗎。', 1.12, 1.9);
+}
+
+function resize(){
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  w = window.innerWidth; h = window.innerHeight;
+  canvas.width = Math.floor(w*dpr); canvas.height = Math.floor(h*dpr);
+  canvas.style.width = w+'px'; canvas.style.height = h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(!pet.x){
+    pet.x = w*0.5; pet.y = h*0.56; pet.baseX = pet.x; pet.baseY = pet.y;
+    pet.targetX = pet.x; pet.targetY = pet.y;
+  } else {
+    pet.baseX = w*0.5; pet.baseY = h*0.56;
+  }
+  makeStars();
+}
+window.addEventListener('resize', resize);
+
+function makeStars(){
+  stars = [];
+  const count = Math.max(36, Math.floor((w*h)/19000));
+  for(let i=0;i<count;i++){
+    stars.push({x:Math.random()*w,y:Math.random()*h,s:Math.random()*2+0.7,a:Math.random()*0.6+0.1,vy:Math.random()*0.15+0.04});
+  }
+}
+
+function getPalette(){ return palettes[paletteIndex]; }
+function setStatus(msg){ statusEl.textContent = msg; }
+
+function updateUI(){
+  moodBar.style.width = pet.mood + '%'; moodVal.textContent = Math.round(pet.mood);
+  foodBar.style.width = pet.food + '%'; foodVal.textContent = Math.round(pet.food);
+  energyBar.style.width = pet.energy + '%'; energyVal.textContent = Math.round(pet.energy);
+  bondBar.style.width = pet.bond + '%'; bondVal.textContent = Math.round(pet.bond);
+}
+
+function refreshEmotion(){
+  if(pet.food < 28) pet.emotion = '肚子餓';
+  else if(pet.energy < 25) pet.emotion = '累累';
+  else if(pet.mood > 85 && pet.bond > 45) pet.emotion = '超開心';
+  else if(pet.mood < 40) pet.emotion = '想被安慰';
+  else if(pet.playTimer > 0) pet.emotion = '玩瘋了';
+  else if(pet.petTimer > 0) pet.emotion = '撒嬌中';
+  else if(pet.eatTimer > 0) pet.emotion = '吃得好開心';
+  else pet.emotion = '好奇';
+  setStatus(pet.name + '：' + pet.emotion);
+}
+
+async function startCamera(){
+  try{
+    ensureAudio();
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+    video.srcObject = stream;
+    await video.play();
+    refreshEmotion();
+    voiceStart();
+  }catch(err){
+    console.error(err);
+    setStatus('相機啟動失敗，先用科幻背景展示');
+  }
+}
+startBtn.addEventListener('click', startCamera);
+
+function emitParticles(x,y,count=18,style='spark'){
+  const pal = getPalette();
+  const emojis = style === 'heart' ? ['❤','♡','💛'] : ['✨','★','✦','💫'];
+  for(let i=0;i<count;i++){
+    const angle = Math.random()*Math.PI*2;
+    const speed = Math.random()*4 + (style==='burst'?3:1);
+    particles.push({
+      x,y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed - (style==='trail'?0.8:0),
+      life: style==='trail'?18+Math.random()*10:28+Math.random()*22,
+      maxLife: style==='trail'?28:50,
+      size: style==='trail'?2+Math.random()*2.5:4+Math.random()*6,
+      color: Math.random()>0.5?pal.glow1:pal.glow2,
+      kind: style, rot: Math.random()*Math.PI*2,
+      text: emojis[Math.floor(Math.random()*emojis.length)]
+    });
+  }
+}
+function addRing(x,y,r,kind='pulse'){ rings.push({x,y,r,life:40,maxLife:40,kind}); }
+
+function feedPet(){
+  pet.food = clamp(pet.food + 18, 0, 100);
+  pet.mood = clamp(pet.mood + 8, 0, 100);
+  pet.energy = clamp(pet.energy + 6, 0, 100);
+  pet.bond = clamp(pet.bond + 4, 0, 100);
+  pet.eatTimer = 2.0;
+  floatingFoods.push({x:w*0.5, y:h-60, targetX:pet.x, targetY:pet.y-12, emoji:'🌽', life:70});
+  emitParticles(pet.x, pet.y-10, 20, 'spark');
+  addRing(pet.x, pet.y, 28, 'pulse');
+  updateUI(); refreshEmotion(); voiceFeed();
+}
+feedBtn.addEventListener('click', feedPet);
+
+function petting(){
+  pet.mood = clamp(pet.mood + 10, 0, 100);
+  pet.bond = clamp(pet.bond + 7, 0, 100);
+  pet.energy = clamp(pet.energy - 2, 0, 100);
+  pet.petTimer = 2.2;
+  emitParticles(pet.x, pet.y-30, 20, 'heart');
+  addRing(pet.x, pet.y-8, 22, 'pulse');
+  updateUI(); refreshEmotion(); voicePet();
+}
+petBtn.addEventListener('click', petting);
+
+function playWithPet(){
+  pet.mood = clamp(pet.mood + 14, 0, 100);
+  pet.energy = clamp(pet.energy - 10, 0, 100);
+  pet.food = clamp(pet.food - 6, 0, 100);
+  pet.bond = clamp(pet.bond + 6, 0, 100);
+  pet.playTimer = 2.8;
+  pet.burstPower = 18;
+  emitParticles(pet.x, pet.y, 36, 'burst');
+  addRing(pet.x, pet.y, 36, 'burst');
+  updateUI(); refreshEmotion(); voicePlay();
+}
+playBtn.addEventListener('click', playWithPet);
+
+modeBtn.addEventListener('click', ()=>{
+  pet.mode = (pet.mode + 1) % 3;
+  const names = ['穩定漂浮模式','軌道漂浮模式','跟隨目標模式'];
+  emitParticles(pet.x, pet.y, 24, 'spark');
+  addRing(pet.x, pet.y, 30, 'pulse');
+  setStatus(names[pet.mode]);
+  voiceMode();
+});
+
+colorBtn.addEventListener('click', ()=>{
+  paletteIndex = (paletteIndex + 1) % palettes.length;
+  emitParticles(pet.x, pet.y, 24, 'spark');
+  addRing(pet.x, pet.y, 26, 'pulse');
+  refreshEmotion();
+  voiceColor();
+});
+
+function passiveDecay(dt){
+  pet.food = clamp(pet.food - 0.007*dt, 0, 100);
+  pet.energy = clamp(pet.energy - 0.005*dt, 0, 100);
+  pet.mood = clamp(pet.mood - 0.003*dt, 0, 100);
+  if(pet.food < 25 || pet.energy < 25) pet.mood = clamp(pet.mood - 0.01*dt, 0, 100);
+}
+
+function drawBackground(){
+  ctx.save();
+  const g = ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'rgba(8,16,36,0.18)');
+  g.addColorStop(1,'rgba(14,8,26,0.22)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+
+  const pal = getPalette();
+  const beam1 = ctx.createRadialGradient(w*0.2,h*0.25,10,w*0.2,h*0.25,w*0.45);
+  beam1.addColorStop(0, 'rgba(' + pal.glow1 + ',0.18)');
+  beam1.addColorStop(1, 'rgba(' + pal.glow1 + ',0)');
+  ctx.fillStyle = beam1; ctx.fillRect(0,0,w,h);
+
+  const beam2 = ctx.createRadialGradient(w*0.78,h*0.32,8,w*0.78,h*0.32,w*0.42);
+  beam2.addColorStop(0, 'rgba(' + pal.glow2 + ',0.18)');
+  beam2.addColorStop(1, 'rgba(' + pal.glow2 + ',0)');
+  ctx.fillStyle = beam2; ctx.fillRect(0,0,w,h);
+
+  for(const s of stars){
+    s.y += s.vy;
+    if(s.y > h+3){ s.y = -3; s.x = Math.random()*w; }
+    ctx.fillStyle = 'rgba(255,255,255,' + s.a + ')';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.s,0,Math.PI*2); ctx.fill();
+  }
+
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.lineWidth = 1;
+  for(let i=-w;i<w*2;i+=44){
+    ctx.beginPath();
+    ctx.moveTo(i,h);
+    ctx.lineTo(w*0.5 + (i-w*0.5)*0.12, h*0.7);
+    ctx.stroke();
+  }
+  for(let y=h*0.72; y<h; y+=28){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function updatePet(dt){
+  pet.t += 0.018*dt;
+  pet.bobT += 0.03*dt;
+  pet.auraSpin += 0.028*dt;
+  pet.blinkT += 0.016*dt;
+  pet.flapT += 0.05*dt;
+  if(pet.blinkT > 5.4){ pet.blink = true; if(pet.blinkT > 5.62){ pet.blink = false; pet.blinkT = 0; } }
+
+  if(pet.burstPower > 0) pet.burstPower -= 0.7*dt;
+  if(pet.eatTimer > 0) pet.eatTimer -= 0.016*dt;
+  if(pet.playTimer > 0) pet.playTimer -= 0.016*dt;
+  if(pet.petTimer > 0) pet.petTimer -= 0.016*dt;
+
+  passiveDecay(dt);
+
+  if(!drag){
+    if(pet.mode === 0){
+      const tx = pet.baseX + Math.cos(pet.t*0.8)*20;
+      const ty = pet.baseY + Math.sin(pet.t*1.9)*26;
+      pet.vx += (tx - pet.x)*0.034;
+      pet.vy += (ty - pet.y)*0.034;
+    } else if(pet.mode === 1){
+      const radius = 62 + Math.sin(pet.t*1.3)*12;
+      const tx = pet.baseX + Math.cos(pet.t*1.4)*radius;
+      const ty = pet.baseY + Math.sin(pet.t*1.4)*radius*0.45;
+      pet.vx += (tx - pet.x)*0.05;
+      pet.vy += (ty - pet.y)*0.05;
+    } else {
+      pet.vx += (pet.targetX - pet.x)*0.03;
+      pet.vy += (pet.targetY - pet.y)*0.03;
+      pet.vy += Math.sin(pet.t*2.1)*0.12;
+    }
+    pet.vx *= 0.88; pet.vy *= 0.88;
+    pet.x += pet.vx*dt; pet.y += pet.vy*dt;
+  }
+
+  if(Math.random() < 0.25) emitParticles(pet.x + (Math.random()-0.5)*16, pet.y + 20, 1, 'trail');
+  if(Math.random() < 0.04) addRing(pet.x, pet.y+18, 10 + Math.random()*10, 'micro');
+
+  pet.mood = clamp(pet.mood,0,100); pet.food = clamp(pet.food,0,100);
+  pet.energy = clamp(pet.energy,0,100); pet.bond = clamp(pet.bond,0,100);
+  updateUI();
+}
+
+function drawEnergyColumn(){
+  const pal = getPalette();
+  const beam = ctx.createLinearGradient(pet.x, pet.y-180, pet.x, pet.y+160);
+  beam.addColorStop(0, 'rgba(255,255,255,0)');
+  beam.addColorStop(0.35, 'rgba(' + pal.glow1 + ',0.12)');
+  beam.addColorStop(0.7, 'rgba(' + pal.glow2 + ',0.18)');
+  beam.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save();
+  ctx.fillStyle = beam;
+  ctx.beginPath(); ctx.ellipse(pet.x, pet.y, 44 + Math.sin(pet.auraSpin*2)*4, 180, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawRings(){
+  const pal = getPalette();
+  ctx.save();
+  ctx.translate(pet.x, pet.y+22);
+  ctx.rotate(pet.auraSpin);
+  ctx.strokeStyle = 'rgba(' + pal.glow1 + ',0.9)';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(0,0,76 + Math.sin(pet.auraSpin*2)*3,18,0,0,Math.PI*2); ctx.stroke();
+  for(let i=0;i<10;i++){
+    const a=(Math.PI*2/10)*i + pet.auraSpin*1.6;
+    ctx.fillStyle = i%2 ? 'rgba(' + pal.glow2 + ',0.9)' : '#fff';
+    ctx.beginPath(); ctx.arc(Math.cos(a)*76, Math.sin(a)*18, 2.7, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(pet.x, pet.y-8);
+  ctx.rotate(-pet.auraSpin*1.35);
+  ctx.strokeStyle = 'rgba(' + pal.glow2 + ',0.85)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(0,0,22,68,Math.PI/7,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+function drawDuck(){
+  const pal = getPalette();
+  const body = pal.body, wing=pal.wing, accent=pal.accent;
+  const bob = Math.sin(pet.bobT*4)*5 + (pet.playTimer>0 ? Math.sin(pet.bobT*14)*5 : 0);
+  const floatScale = 1 + Math.sin(pet.bobT*3)*0.01 + pet.burstPower*0.0015;
+  const wingFlap = Math.sin(pet.flapT) * (pet.playTimer > 0 ? 18 : 9);
+
+  drawEnergyColumn();
+  drawRings();
+
+  ctx.save();
+  ctx.translate(pet.x, pet.y+bob);
+  ctx.scale(floatScale,floatScale);
+
+  ctx.save();
+  ctx.shadowBlur = 28 + pet.burstPower;
+  ctx.shadowColor = body;
+  const halo = ctx.createRadialGradient(0,-10,8,0,0,74);
+  halo.addColorStop(0,'rgba(255,255,255,.22)');
+  halo.addColorStop(0.4,'rgba(' + getPalette().glow1 + ',.22)');
+  halo.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(0,0,74,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(0,18,52,42,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0,-18,38,0,Math.PI*2); ctx.fill();
+
+  ctx.save();
+  ctx.translate(-22, 12);
+  ctx.rotate((-22 + wingFlap) * Math.PI/180);
+  ctx.fillStyle = wing;
+  ctx.beginPath(); ctx.ellipse(0,0,20,14,-0.2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(22, 12);
+  ctx.rotate((22 - wingFlap) * Math.PI/180);
+  ctx.fillStyle = wing;
+  ctx.beginPath(); ctx.ellipse(0,0,20,14,0.2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(255,245,210,.95)';
+  ctx.beginPath(); ctx.ellipse(0,-6,22,18,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,20,20,16,0,0,Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = '#2b3342';
+  if(pet.blink){
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#2b3342';
+    ctx.beginPath(); ctx.moveTo(-14,-18); ctx.lineTo(-6,-18); ctx.moveTo(6,-18); ctx.lineTo(14,-18); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(-10,-18,4.5,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(10,-18,4.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.beginPath(); ctx.arc(-8,-20,1.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(12,-20,1.3,0,Math.PI*2); ctx.fill();
+  }
+
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.moveTo(0,-6);
+  ctx.lineTo(-13,2);
+  ctx.lineTo(0,6);
+  ctx.lineTo(13,2);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-12,52); ctx.lineTo(-14,62);
+  ctx.moveTo(12,52); ctx.lineTo(14,62);
+  ctx.stroke();
+
+  ctx.save();
+  ctx.rotate(pet.auraSpin*1.4);
+  ctx.font='20px Arial';
+  ctx.fillText(pet.petTimer>0 ? '❤' : '✨', 40, -48);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawNameplate(){
+  const pal = getPalette();
+  const text = pet.name + ' · ' + pet.emotion;
+  ctx.save();
+  ctx.font='bold 13px Arial';
+  const width = ctx.measureText(text).width + 28;
+  const x = pet.x - width/2, y = pet.y - 96;
+  ctx.fillStyle='rgba(8,12,24,.52)';
+  ctx.strokeStyle='rgba(' + pal.glow1 + ',.45)';
+  ctx.lineWidth=1;
+  roundedRectPath(x,y,width,30,14); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.fillText(text, pet.x - ctx.measureText(text).width/2, y+19);
+  ctx.restore();
+}
+
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.985; p.vy *= p.kind==='trail' ? 0.98 : 0.988;
+    if(p.kind!=='trail') p.vy += 0.02;
+    p.life -= 1;
+    if(p.life<=0){ particles.splice(i,1); continue; }
+    const a = p.life/p.maxLife;
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(p.x,p.y); ctx.rotate(p.rot += 0.02);
+    if(p.kind==='trail'){
+      ctx.fillStyle='rgba(' + p.color + ',' + Math.max(0.15,a*0.9) + ')';
+      ctx.shadowBlur=12; ctx.shadowColor='rgba(' + p.color + ',1)';
+      ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
+    } else if(p.kind==='heart'){
+      ctx.font = (12 + p.size) + 'px Arial';
+      ctx.fillText(p.text, 0, 0);
+    } else {
+      ctx.fillStyle='rgba(' + p.color + ',' + Math.max(0.2,a) + ')';
+      ctx.shadowBlur=16; ctx.shadowColor='rgba(' + p.color + ',1)';
+      drawDiamond(0,0,p.size); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function updateRings(){
+  for(let i=rings.length-1;i>=0;i--){
+    const r=rings[i];
+    r.life -= 1;
+    if(r.life<=0){ rings.splice(i,1); continue; }
+    const a=r.life/r.maxLife, grow=(1-a)*36;
+    const pal=getPalette();
+    ctx.save();
+    ctx.strokeStyle = r.kind==='burst' ? 'rgba(' + pal.glow2 + ',' + a + ')' : 'rgba(' + pal.glow1 + ',' + (a*0.8) + ')';
+    ctx.lineWidth = r.kind==='burst' ? 3 : 1.5;
+    ctx.beginPath(); ctx.arc(r.x,r.y,r.r+grow,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function updateFoods(){
+  for(let i=floatingFoods.length-1;i>=0;i--){
+    const f = floatingFoods[i];
+    f.life -= 1;
+    f.x += (f.targetX - f.x)*0.12;
+    f.y += (f.targetY - f.y)*0.12;
+    if(Math.hypot(f.x - f.targetX, f.y - f.targetY) < 16 || f.life <= 0){
+      emitParticles(f.targetX, f.targetY, 14, 'heart');
+      quackSound();
+      floatingFoods.splice(i,1);
+      continue;
+    }
+    ctx.save();
+    ctx.globalAlpha = Math.max(0.3, f.life/70);
+    ctx.font = '26px Arial';
+    ctx.fillText(f.emoji, f.x, f.y);
+    ctx.restore();
+  }
+}
+
+function drawDiamond(x,y,s){
+  ctx.beginPath();
+  ctx.moveTo(x,y-s); ctx.lineTo(x+s,y); ctx.lineTo(x,y+s); ctx.lineTo(x-s,y); ctx.closePath();
+}
+function roundedRectPath(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+}
+
+function animate(ts){
+  requestAnimationFrame(animate);
+  const dt = Math.min(32, ts-lastTime || 16)/16.666;
+  lastTime = ts;
+
+  ctx.clearRect(0,0,w,h);
+  drawBackground();
+  updatePet(dt);
+  drawDuck();
+  drawNameplate();
+  updateFoods();
+  updateParticles();
+  updateRings();
+}
+
+function getPoint(e){
+  if(e.touches && e.touches[0]) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
+  return {x:e.clientX, y:e.clientY};
+}
+
+function onDown(e){
+  const p = getPoint(e);
+  pointer.x=p.x; pointer.y=p.y; pointer.active=true;
+  const d = Math.hypot(p.x-pet.x, p.y-pet.y);
+  if(d < 80){
+    drag=true; dragDX=p.x-pet.x; dragDY=p.y-pet.y;
+    pet.vx=0; pet.vy=0;
+    petting();
+    e.preventDefault();
+  } else {
+    pet.targetX=p.x; pet.targetY=p.y;
+    emitParticles(p.x,p.y,16,'spark'); addRing(p.x,p.y,16,'pulse');
+    quackSound();
+  }
+}
+function onMove(e){
+  const p=getPoint(e);
+  pointer.x=p.x; pointer.y=p.y; pointer.active=true;
+  if(!drag) return;
+  pet.x = p.x - dragDX; pet.y = p.y - dragDY;
+  emitParticles(pet.x, pet.y, 1, 'trail');
+  e.preventDefault();
+}
+function onUp(){ drag=false; pointer.active=false; }
+
+canvas.addEventListener('mousedown', onDown);
+canvas.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+canvas.addEventListener('touchstart', onDown, {passive:false});
+canvas.addEventListener('touchmove', onMove, {passive:false});
+window.addEventListener('touchend', onUp);
+
+canvas.addEventListener('click', function(e){
+  const p=getPoint(e);
+  pet.targetX=p.x; pet.targetY=p.y;
+  emitParticles(p.x,p.y,18,'spark'); addRing(p.x,p.y,16,'pulse');
+});
+
+resize();
+updateUI();
+refreshEmotion();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
