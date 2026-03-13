@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Antigravity Pet Pro Demo</title>
+  <style>
+    :root{
+      --panel-bg: rgba(8,12,24,.42);
+      --panel-border: rgba(255,255,255,.16);
+      --text: #fff;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+    }
+    #app{
+      position:relative;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+    }
+    #camera{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      background:#000;
+      transform:scaleX(-1);
+    }
+    #fx{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      touch-action:none;
+    }
+    .hud{
+      position:absolute;
+      z-index:20;
+      left:12px;
+      right:12px;
+      top:12px;
+      padding:12px 14px;
+      color:var(--text);
+      background:var(--panel-bg);
+      border:1px solid var(--panel-border);
+      border-radius:18px;
+      backdrop-filter:blur(12px);
+      box-shadow:0 14px 32px rgba(0,0,0,.34);
+    }
+    .hud h1{
+      margin:0 0 6px 0;
+      font-size:18px;
+      letter-spacing:.2px;
+    }
+    .hud p{
+      margin:4px 0;
+      font-size:13px;
+      line-height:1.45;
+      opacity:.96;
+    }
+    .tag{
+      display:inline-block;
+      margin-left:8px;
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:11px;
+      background:rgba(130,205,255,.16);
+      color:#e4f6ff;
+      border:1px solid rgba(130,205,255,.24);
+      vertical-align:middle;
+    }
+    .controls{
+      position:absolute;
+      z-index:20;
+      left:12px;
+      right:12px;
+      bottom:12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    button{
+      border:1px solid var(--panel-border);
+      background:rgba(10,16,28,.62);
+      color:#fff;
+      padding:10px 14px;
+      border-radius:14px;
+      font-size:14px;
+      backdrop-filter:blur(8px);
+      cursor:pointer;
+    }
+    #status{
+      font-weight:700;
+      color:#d7ecff;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <video id="camera" playsinline autoplay muted></video>
+  <canvas id="fx"></canvas>
+
+  <div class="hud">
+    <h1>Antigravity Pet Pro <span class="tag">進階版</span></h1>
+    <p>這版把 Antigravity 做得更完整：漂浮軌道、雙能量環、極光光柱、粒子尾流、星塵爆發、寵物追蹤目標點。</p>
+    <p>操作：拖曳移動；點畫面可設定飛行目標；雙擊切模式；按下按鈕可切換寵物、爆發、彩色量子環。</p>
+    <p>狀態：<span id="status">請按下「啟動相機」</span></p>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">啟動相機</button>
+    <button id="petBtn">換寵物</button>
+    <button id="modeBtn">切模式</button>
+    <button id="burstBtn">Quantum Burst</button>
+    <button id="colorBtn">換色</button>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('camera');
+const canvas = document.getElementById('fx');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+const startBtn = document.getElementById('startBtn');
+const petBtn = document.getElementById('petBtn');
+const modeBtn = document.getElementById('modeBtn');
+const burstBtn = document.getElementById('burstBtn');
+const colorBtn = document.getElementById('colorBtn');
+
+let w=0,h=0,dpr=Math.max(1,window.devicePixelRatio||1);
+let lastTime=0;
+let stars=[], particles=[], rings=[];
+let drag=false, dragDX=0, dragDY=0;
+let pointer = {x:0,y:0,active:false};
+
+const palettes = [
+  {a:'#7df9ff', b:'#c084fc', glow1:'125,249,255', glow2:'192,132,252'},
+  {a:'#ffe066', b:'#ff8fab', glow1:'255,224,102', glow2:'255,143,171'},
+  {a:'#7bf1a8', b:'#66b3ff', glow1:'123,241,168', glow2:'102,179,255'},
+  {a:'#ff9f68', b:'#ffd166', glow1:'255,159,104', glow2:'255,209,102'}
+];
+let paletteIndex = 0;
+
+const pets = [
+  {name:'Quantum Cat', type:'cat'},
+  {name:'Nebula Bunny', type:'bunny'},
+  {name:'Nova Chick', type:'chick'}
+];
+let petIndex = 0;
+let mode = 0;
+
+const pet = {
+  x:0, y:0,
+  baseX:0, baseY:0,
+  vx:0, vy:0,
+  t:0,
+  bobT:0,
+  targetX:0, targetY:0,
+  auraSpin:0,
+  blinkT:0,
+  blink:false,
+  burstPower:0
+};
+
+function resize(){
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  w = window.innerWidth;
+  h = window.innerHeight;
+  canvas.width = Math.floor(w*dpr);
+  canvas.height = Math.floor(h*dpr);
+  canvas.style.width = w+'px';
+  canvas.style.height = h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(!pet.x){
+    pet.x = w*0.5;
+    pet.y = h*0.55;
+    pet.baseX = pet.x;
+    pet.baseY = pet.y;
+    pet.targetX = pet.x;
+    pet.targetY = pet.y;
+  } else {
+    pet.baseX = w*0.5;
+    pet.baseY = h*0.55;
+  }
+  makeStars();
+}
+window.addEventListener('resize', resize);
+
+function makeStars(){
+  stars = [];
+  const count = Math.max(40, Math.floor((w*h)/18000));
+  for(let i=0;i<count;i++){
+    stars.push({
+      x: Math.random()*w,
+      y: Math.random()*h,
+      s: Math.random()*2.2+0.6,
+      a: Math.random()*0.6+0.1,
+      vy: Math.random()*0.18+0.05
+    });
+  }
+}
+
+function setStatus(msg){ statusEl.textContent = msg; }
+
+async function startCamera(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'environment' },
+      audio:false
+    });
+    video.srcObject = stream;
+    await video.play();
+    setStatus('相機已啟動：' + pets[petIndex].name + ' 進入反重力模式');
+  }catch(err){
+    console.error(err);
+    setStatus('相機啟動失敗，先以科幻背景展示');
+  }
+}
+startBtn.addEventListener('click', startCamera);
+
+function getPalette(){ return palettes[paletteIndex]; }
+
+function emitParticles(x,y,count=18,style='spark'){
+  const pal = getPalette();
+  for(let i=0;i<count;i++){
+    const angle = Math.random()*Math.PI*2;
+    const speed = Math.random()*4 + (style==='burst'?3.2:1.2);
+    particles.push({
+      x,y,
+      vx: Math.cos(angle)*speed,
+      vy: Math.sin(angle)*speed - (style==='trail'?0.8:0),
+      life: style==='trail' ? 18+Math.random()*14 : 28+Math.random()*28,
+      maxLife: style==='trail' ? 30 : 56,
+      size: style==='trail' ? 2+Math.random()*3 : 4+Math.random()*7,
+      color: Math.random()>0.5 ? pal.glow1 : pal.glow2,
+      kind: style,
+      rot: Math.random()*Math.PI*2
+    });
+  }
+}
+
+function addRing(x,y,r,kind='pulse'){
+  rings.push({x,y,r,life:42,maxLife:42,kind});
+}
+
+function quantumBurst(){
+  pet.burstPower = 34;
+  emitParticles(pet.x, pet.y, 60, 'burst');
+  addRing(pet.x, pet.y, 40, 'burst');
+  setStatus('Quantum Burst triggered');
+}
+burstBtn.addEventListener('click', quantumBurst);
+
+petBtn.addEventListener('click', ()=>{
+  petIndex = (petIndex+1)%pets.length;
+  emitParticles(pet.x, pet.y-10, 28, 'spark');
+  addRing(pet.x, pet.y, 34, 'pulse');
+  setStatus('切換成 ' + pets[petIndex].name);
+});
+
+modeBtn.addEventListener('click', ()=>{
+  mode = (mode+1)%3;
+  emitParticles(pet.x, pet.y, 24, 'spark');
+  addRing(pet.x, pet.y, 36, 'pulse');
+  const names = ['穩定漂浮模式','軌道漂浮模式','追蹤飛行模式'];
+  setStatus(names[mode]);
+});
+
+colorBtn.addEventListener('click', ()=>{
+  paletteIndex = (paletteIndex+1)%palettes.length;
+  emitParticles(pet.x, pet.y, 28, 'spark');
+  setStatus('量子色盤已切換');
+});
+
+function drawBackground(){
+  ctx.save();
+  const g = ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'rgba(8,16,36,0.18)');
+  g.addColorStop(1,'rgba(14,8,26,0.20)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,w,h);
+
+  const pal = getPalette();
+  const beam1 = ctx.createRadialGradient(w*0.2,h*0.25,10,w*0.2,h*0.25,w*0.45);
+  beam1.addColorStop(0, 'rgba(' + pal.glow1 + ',0.18)');
+  beam1.addColorStop(1, 'rgba(' + pal.glow1 + ',0)');
+  ctx.fillStyle = beam1;
+  ctx.fillRect(0,0,w,h);
+
+  const beam2 = ctx.createRadialGradient(w*0.78,h*0.32,8,w*0.78,h*0.32,w*0.42);
+  beam2.addColorStop(0, 'rgba(' + pal.glow2 + ',0.18)');
+  beam2.addColorStop(1, 'rgba(' + pal.glow2 + ',0)');
+  ctx.fillStyle = beam2;
+  ctx.fillRect(0,0,w,h);
+
+  for(const s of stars){
+    s.y += s.vy;
+    if(s.y > h+3){ s.y = -3; s.x = Math.random()*w; }
+    ctx.fillStyle = 'rgba(255,255,255,' + s.a + ')';
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.s,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.lineWidth = 1;
+  for(let i=-w;i<w*2;i+=44){
+    ctx.beginPath();
+    ctx.moveTo(i,h);
+    ctx.lineTo(w*0.5 + (i-w*0.5)*0.12, h*0.7);
+    ctx.stroke();
+  }
+  for(let y=h*0.72; y<h; y+=28){
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(w,y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function updatePet(dt){
+  pet.t += 0.018*dt;
+  pet.bobT += 0.03*dt;
+  pet.auraSpin += 0.028*dt;
+  pet.blinkT += 0.016*dt;
+  if(pet.blinkT > 5.4){
+    pet.blink = true;
+    if(pet.blinkT > 5.62){ pet.blink=false; pet.blinkT = 0; }
+  }
+  if(pet.burstPower>0) pet.burstPower -= 0.9*dt;
+
+  if(drag) return;
+
+  if(mode===0){
+    const tx = pet.baseX + Math.cos(pet.t*0.7)*20;
+    const ty = pet.baseY + Math.sin(pet.t*1.9)*26;
+    pet.vx += (tx - pet.x)*0.035;
+    pet.vy += (ty - pet.y)*0.035;
+  }else if(mode===1){
+    const radius = 65 + Math.sin(pet.t*1.4)*14;
+    const tx = pet.baseX + Math.cos(pet.t*1.4)*radius;
+    const ty = pet.baseY + Math.sin(pet.t*1.4)*radius*0.45;
+    pet.vx += (tx - pet.x)*0.05;
+    pet.vy += (ty - pet.y)*0.05;
+  }else{
+    pet.vx += (pet.targetX - pet.x)*0.03;
+    pet.vy += (pet.targetY - pet.y)*0.03;
+    pet.vy += Math.sin(pet.t*2.3)*0.12;
+  }
+
+  pet.vx *= 0.88;
+  pet.vy *= 0.88;
+  pet.x += pet.vx*dt;
+  pet.y += pet.vy*dt;
+
+  emitParticles(pet.x + (Math.random()-0.5)*16, pet.y + 20, 1, 'trail');
+  if(Math.random()<0.05) addRing(pet.x, pet.y+18, 12 + Math.random()*10, 'micro');
+}
+
+function drawEnergyColumn(){
+  const pal = getPalette();
+  const beam = ctx.createLinearGradient(pet.x, pet.y-180, pet.x, pet.y+160);
+  beam.addColorStop(0, 'rgba(255,255,255,0)');
+  beam.addColorStop(0.35, 'rgba(' + pal.glow1 + ',0.12)');
+  beam.addColorStop(0.7, 'rgba(' + pal.glow2 + ',0.18)');
+  beam.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save();
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  ctx.ellipse(pet.x, pet.y, 44 + Math.sin(pet.auraSpin*2)*4, 180, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawRings(){
+  const pal = getPalette();
+  ctx.save();
+  ctx.translate(pet.x, pet.y+22);
+  ctx.rotate(pet.auraSpin);
+  ctx.strokeStyle = 'rgba(' + pal.glow1 + ',0.9)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(0,0,78 + Math.sin(pet.auraSpin*2)*3,18,0,0,Math.PI*2);
+  ctx.stroke();
+
+  for(let i=0;i<10;i++){
+    const a = (Math.PI*2/10)*i + pet.auraSpin*1.6;
+    const rx = Math.cos(a)*78;
+    const ry = Math.sin(a)*18;
+    ctx.fillStyle = i%2 ? 'rgba(' + pal.glow2 + ',0.9)' : '#fff';
+    ctx.beginPath();
+    ctx.arc(rx, ry, 2.8, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(pet.x, pet.y-8);
+  ctx.rotate(-pet.auraSpin*1.35);
+  ctx.strokeStyle = 'rgba(' + pal.glow2 + ',0.85)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(0,0,22,68,Math.PI/7,0,Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
+
+  if(mode===2){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(pet.targetX, pet.targetY, 22 + Math.sin(pet.auraSpin*3)*2, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pet.targetX-10, pet.targetY);
+    ctx.lineTo(pet.targetX+10, pet.targetY);
+    ctx.moveTo(pet.targetX, pet.targetY-10);
+    ctx.lineTo(pet.targetX, pet.targetY+10);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawPet(){
+  const pal = getPalette();
+  const kind = pets[petIndex].type;
+  const bob = Math.sin(pet.bobT*4) * 5;
+  const floatScale = 1 + Math.sin(pet.bobT*3)*0.01 + pet.burstPower*0.0018;
+  const body = pal.a;
+  const face = 'rgba(255,255,255,.96)';
+  const accent = pal.b;
+
+  drawEnergyColumn();
+  drawRings();
+
+  ctx.save();
+  ctx.translate(pet.x, pet.y+bob);
+  ctx.scale(floatScale,floatScale);
+
+  ctx.save();
+  ctx.shadowBlur = 28 + pet.burstPower;
+  ctx.shadowColor = body;
+  const halo = ctx.createRadialGradient(0,-10,8,0,0,74);
+  halo.addColorStop(0,'rgba(255,255,255,.22)');
+  halo.addColorStop(0.4, 'rgba(' + pal.glow1 + ',.22)');
+  halo.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(0,0,74,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  if(kind === 'bunny'){
+    ctx.fillStyle = body;
+    roundRect(-28,-102,18,56,12); ctx.fill();
+    roundRect(10,-102,18,56,12); ctx.fill();
+    ctx.fillStyle = accent;
+    roundRect(-22,-94,8,38,8); ctx.fill();
+    roundRect(16,-94,8,38,8); ctx.fill();
+  } else if(kind === 'cat'){
+    ctx.fillStyle = body;
+    tri(-34,-34,-12,-86,-2,-38); ctx.fill();
+    tri(34,-34,12,-86,2,-38); ctx.fill();
+    ctx.fillStyle = accent;
+    tri(-26,-40,-12,-70,-6,-40); ctx.fill();
+    tri(26,-40,12,-70,6,-40); ctx.fill();
+  } else if(kind === 'chick'){
+    ctx.fillStyle = accent;
+    tri(-8,-62,-2,-82,4,-62); ctx.fill();
+    tri(0,-64,8,-88,14,-62); ctx.fill();
+  }
+
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(0,24,50,44,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0,-18,44,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle = face;
+  ctx.beginPath(); ctx.ellipse(0,-8,28,22,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,24,22,18,0,0,Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = 'rgba(255,160,185,.72)';
+  ctx.beginPath(); ctx.arc(-18,-6,6,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(18,-6,6,0,Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = '#283040';
+  if(pet.blink){
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#283040';
+    ctx.beginPath();
+    ctx.moveTo(-18,-14); ctx.lineTo(-8,-14);
+    ctx.moveTo(8,-14); ctx.lineTo(18,-14);
+    ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(-13,-14,4.6,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(13,-14,4.6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.beginPath(); ctx.arc(-11,-16,1.4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(15,-16,1.4,0,Math.PI*2); ctx.fill();
+  }
+
+  if(kind === 'chick'){
+    ctx.fillStyle = accent;
+    tri(0,-3,-8,4,8,4); ctx.fill();
+  } else {
+    ctx.fillStyle = '#6b4856';
+    ctx.beginPath(); ctx.arc(0,-2,3.3,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#6b4856';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0,2); ctx.quadraticCurveTo(-6,8,-10,4);
+    ctx.moveTo(0,2); ctx.quadraticCurveTo(6,8,10,4);
+    ctx.stroke();
+
+    if(kind === 'cat'){
+      ctx.strokeStyle = 'rgba(255,255,255,.72)';
+      ctx.lineWidth = 1.2;
+      for(const sy of [-6,1,8]){
+        ctx.beginPath();
+        ctx.moveTo(-22, sy); ctx.lineTo(-38, sy-2);
+        ctx.moveTo(22, sy); ctx.lineTo(38, sy-2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.fillStyle = face;
+  ctx.beginPath(); ctx.ellipse(-16,50,10,7,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(16,50,10,7,0,0,Math.PI*2); ctx.fill();
+
+  if(kind === 'cat'){
+    ctx.strokeStyle = body;
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(40,24);
+    ctx.quadraticCurveTo(72,-2,56,-36 + Math.sin(pet.bobT*5)*8);
+    ctx.stroke();
+  } else if(kind === 'bunny'){
+    ctx.fillStyle = face;
+    ctx.beginPath();
+    ctx.arc(42,24,10,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.rotate(pet.auraSpin*1.4);
+  ctx.font = '20px Arial';
+  ctx.fillText('✨', 40, -48);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawNameplate(){
+  const pal = getPalette();
+  const text = pets[petIndex].name;
+  ctx.save();
+  ctx.font = 'bold 13px Arial';
+  const width = ctx.measureText(text).width + 28;
+  const x = pet.x - width/2;
+  const y = pet.y - 96;
+  ctx.fillStyle = 'rgba(8,12,24,.52)';
+  ctx.strokeStyle = 'rgba(' + pal.glow1 + ',.45)';
+  ctx.lineWidth = 1;
+  roundedRectPath(x,y,width,30,14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, pet.x - ctx.measureText(text).width/2, y+19);
+  ctx.restore();
+}
+
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.985;
+    p.vy *= p.kind==='trail' ? 0.98 : 0.988;
+    if(p.kind !== 'trail') p.vy += 0.02;
+    p.life -= 1;
+    if(p.life<=0){ particles.splice(i,1); continue; }
+    const a = p.life / p.maxLife;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(p.x,p.y);
+    ctx.rotate(p.rot += 0.02);
+    if(p.kind === 'trail'){
+      ctx.fillStyle = 'rgba(' + p.color + ',' + Math.max(0.15,a*0.9) + ')';
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = 'rgba(' + p.color + ',1)';
+      ctx.beginPath();
+      ctx.arc(0,0,p.size,0,Math.PI*2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(' + p.color + ',' + Math.max(0.2,a) + ')';
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = 'rgba(' + p.color + ',1)';
+      drawDiamond(0,0,p.size);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function updateRings(){
+  for(let i=rings.length-1;i>=0;i--){
+    const r = rings[i];
+    r.life -= 1;
+    if(r.life<=0){ rings.splice(i,1); continue; }
+    const a = r.life/r.maxLife;
+    const grow = (1-a)*40;
+    const pal = getPalette();
+    ctx.save();
+    ctx.strokeStyle = r.kind==='burst'
+      ? 'rgba(' + pal.glow2 + ',' + a + ')'
+      : 'rgba(' + pal.glow1 + ',' + (a*0.8) + ')';
+    ctx.lineWidth = r.kind==='burst' ? 3 : 1.5;
+    ctx.beginPath();
+    ctx.arc(r.x,r.y,r.r+grow,0,Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawDiamond(x,y,s){
+  ctx.beginPath();
+  ctx.moveTo(x, y-s);
+  ctx.lineTo(x+s, y);
+  ctx.lineTo(x, y+s);
+  ctx.lineTo(x-s, y);
+  ctx.closePath();
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+}
+function roundedRectPath(x,y,w,h,r){ roundRect(x,y,w,h,r); }
+function tri(x1,y1,x2,y2,x3,y3){
+  ctx.beginPath();
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(x2,y2);
+  ctx.lineTo(x3,y3);
+  ctx.closePath();
+}
+
+function animate(ts){
+  requestAnimationFrame(animate);
+  const dt = Math.min(32, ts-lastTime || 16)/16.666;
+  lastTime = ts;
+
+  ctx.clearRect(0,0,w,h);
+  drawBackground();
+  updatePet(dt);
+  drawPet();
+  drawNameplate();
+  updateParticles();
+  updateRings();
+
+  if(pointer.active && mode===2){
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,.18)';
+    ctx.setLineDash([6,6]);
+    ctx.beginPath();
+    ctx.moveTo(pet.x, pet.y);
+    ctx.lineTo(pointer.x, pointer.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function getPoint(e){
+  if(e.touches && e.touches[0]) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
+  return {x:e.clientX, y:e.clientY};
+}
+
+function onDown(e){
+  const p = getPoint(e);
+  pointer.x = p.x; pointer.y = p.y; pointer.active = true;
+  const d = Math.hypot(p.x-pet.x, p.y-pet.y);
+  if(d < 78){
+    drag = true;
+    dragDX = p.x - pet.x;
+    dragDY = p.y - pet.y;
+    pet.vx = 0; pet.vy = 0;
+    e.preventDefault();
+  } else {
+    pet.targetX = p.x;
+    pet.targetY = p.y;
+    emitParticles(p.x,p.y,18,'spark');
+    addRing(p.x,p.y,18,'pulse');
+  }
+}
+function onMove(e){
+  const p = getPoint(e);
+  pointer.x = p.x; pointer.y = p.y; pointer.active = true;
+  if(!drag) return;
+  pet.x = p.x - dragDX;
+  pet.y = p.y - dragDY;
+  emitParticles(pet.x,pet.y,1,'trail');
+  e.preventDefault();
+}
+function onUp(){
+  drag = false;
+  pointer.active = false;
+}
+
+canvas.addEventListener('mousedown', onDown);
+canvas.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+canvas.addEventListener('touchstart', onDown, {passive:false});
+canvas.addEventListener('touchmove', onMove, {passive:false});
+window.addEventListener('touchend', onUp);
+
+let lastTap = 0;
+canvas.addEventListener('click', function(e){
+  const p = getPoint(e);
+  pet.targetX = p.x;
+  pet.targetY = p.y;
+  emitParticles(p.x,p.y,20,'spark');
+  addRing(p.x,p.y,16,'pulse');
+});
+canvas.addEventListener('touchend', function(){
+  const now = Date.now();
+  if(now-lastTap<320){
+    mode = (mode+1)%3;
+    setStatus(['穩定漂浮模式','軌道漂浮模式','追蹤飛行模式'][mode]);
+    emitParticles(pet.x, pet.y, 20, 'spark');
+  }
+  lastTap = now;
+});
+
+resize();
+setStatus('請按下「啟動相機」開始');
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
