@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Study Companion v16 Pro</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1020;color:#fff;font-family:Arial,"Microsoft JhengHei",sans-serif}
+#app{position:relative;width:100%;height:100%;overflow:hidden}
+#scene{position:absolute;inset:0;width:100%;height:100%}
+.panel{position:absolute;background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.12);border-radius:16px;backdrop-filter:blur(8px);z-index:20}
+#topBar{top:10px;left:10px;right:10px;padding:10px 12px}
+.stats{display:grid;grid-template-columns:60px 1fr 44px;gap:7px 8px;align-items:center}
+.label{font-size:12px;opacity:.9}.bar{height:8px;background:rgba(255,255,255,.16);border-radius:999px;overflow:hidden}.fill{height:100%;border-radius:999px}.value{font-size:12px;text-align:right;color:#e8f2ff}
+#focusBox{left:12px;top:98px;padding:12px 14px;min-width:225px}
+#timerBox{right:12px;top:98px;padding:12px 14px;min-width:170px;text-align:right}
+#formBox{left:12px;top:250px;padding:10px 12px;min-width:265px}
+.small{font-size:11px;opacity:.8}.big{font-size:24px;font-weight:800;color:#dffcff}.meta{font-size:12px;opacity:.92;margin-top:4px;line-height:1.4}
+#status{position:absolute;left:50%;transform:translateX(-50%);bottom:88px;z-index:22;min-width:260px;max-width:min(88vw,720px);padding:10px 16px;background:rgba(0,0,0,.36);border:1px solid rgba(255,255,255,.12);border-radius:999px;text-align:center;font-weight:700;opacity:0;transition:opacity .8s ease}
+#talk{position:absolute;left:50%;top:300px;transform:translateX(-50%);z-index:22;max-width:min(78vw,420px);padding:10px 14px;background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.12);border-radius:18px;text-align:center;font-weight:700;opacity:0;transition:opacity .8s ease}
+.fab{position:absolute;z-index:24;display:flex;align-items:center;justify-content:center;border-radius:999px;border:1px solid rgba(255,255,255,.15);color:#fff;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.22);cursor:pointer}
+#feedBtn{left:14px;top:206px;width:58px;height:58px;background:rgba(255,213,74,.22);font-size:26px}
+#petBtn{right:14px;top:206px;width:58px;height:58px;background:rgba(255,141,179,.22);font-size:26px}
+#eggBtn{left:14px;top:274px;width:58px;height:58px;background:rgba(158,255,203,.20);font-size:26px}
+#settingsBtn{right:14px;bottom:18px;width:56px;height:56px;font-size:24px}
+#tasksBtn{left:14px;bottom:18px;width:56px;height:56px;font-size:24px}
+#codexBtn{left:82px;bottom:18px;width:56px;height:56px;font-size:24px}
+#evolveBtn{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;z-index:24;padding:14px 26px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(198,146,255,.22);color:#fff;font-weight:800;font-size:17px;cursor:pointer}
+.drawer{position:absolute;z-index:23;padding:12px;width:min(390px,calc(100vw - 28px));max-height:58vh;overflow:auto}
+.hidden{display:none}
+#settingsPanel{right:14px;bottom:82px}
+#tasksPanel{left:14px;bottom:82px}
+#codexPanel{right:14px;top:98px;width:min(430px,calc(100vw - 28px))}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+button{padding:12px;border:none;border-radius:14px;color:#fff;font-weight:700;background:rgba(0,0,0,.58);border:1px solid rgba(255,255,255,.10);cursor:pointer}
+#customWrap input{width:100%;margin-top:6px;margin-bottom:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:#fff}
+.sectionTitle{font-size:12px;font-weight:800;letter-spacing:.3px;opacity:.94;margin-bottom:8px}
+.badge,.task,.card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.10);border-radius:12px;color:#fff}
+.badge{display:inline-block;padding:7px 11px;margin:0 8px 8px 0;font-size:12px}
+.task{padding:8px 10px;margin:0 0 8px 0;font-size:12px}
+.card{padding:10px 12px;margin-bottom:8px}
+#reward{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;width:min(420px,calc(100vw - 28px));padding:18px;background:rgba(0,0,0,.60);border:1px solid rgba(255,255,255,.14);border-radius:22px;text-align:center}
+#rewardTitle{font-size:24px;font-weight:900;color:#fff1a8;margin-bottom:8px}
+#rewardBody{font-size:15px;margin-bottom:10px}
+#rewardMeta{font-size:13px;opacity:.9;margin-bottom:14px}
+#unlock{position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.22);backdrop-filter:blur(2px);transition:opacity .18s ease}
+#unlockCard{padding:22px 24px;border-radius:24px;background:rgba(0,0,0,.48);border:1px solid rgba(255,255,255,.12);text-align:center;max-width:min(88vw,460px)}
+#unlockTitle{font-size:30px;font-weight:900;margin-bottom:8px}
+#unlockBtn{margin-top:14px;padding:12px 18px;border-radius:999px;background:rgba(121,242,255,.18);color:#fff;border:1px solid rgba(255,255,255,.14);font-weight:800;cursor:pointer}
+.rarity-common{color:#fff}.rarity-rare{color:#95e5ff}.rarity-legendary{color:#ffd86f}.rarity-hidden{color:#ff9ddb}
+@media (max-width:560px){.grid{grid-template-columns:1fr} #formBox{top:270px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+  <div id="topBar" class="panel">
+    <div class="stats">
+      <div class="label">HP</div><div class="bar"><div id="hpBar" class="fill" style="width:92%;background:#ff6b6b"></div></div><div id="hpVal" class="value">92</div>
+      <div class="label">飽食</div><div class="bar"><div id="foodBar" class="fill" style="width:78%;background:#ffd54a"></div></div><div id="foodVal" class="value">78</div>
+      <div class="label">能量</div><div class="bar"><div id="energyBar" class="fill" style="width:86%;background:#79f2ff"></div></div><div id="energyVal" class="value">86</div>
+      <div class="label">親密</div><div class="bar"><div id="bondBar" class="fill" style="width:40%;background:#c692ff"></div></div><div id="bondVal" class="value">40</div>
+    </div>
+  </div>
+  <div id="focusBox" class="panel">
+    <div class="small">今日專注</div>
+    <div id="todayFocus" class="big">0m</div>
+    <div id="sessionInfo" class="meta">0 個番茄鐘完成</div>
+    <div id="streakInfo" class="meta">連續 0 天</div>
+    <div id="xpInfo" class="meta">等級 1 · XP 0</div>
+    <div id="eggInfo" class="meta">細菌蛋：0 顆</div>
+  </div>
+  <div id="timerBox" class="panel">
+    <div id="timerMode" class="small">專注</div>
+    <div id="timerText" class="big" style="color:#fff1a8">25:00</div>
+    <div id="timerRound" class="meta">第 1 輪</div>
+    <div id="loginInfo" class="meta">每日登入：未領取</div>
+  </div>
+  <div id="formBox" class="panel">
+    <div id="formName" style="font-size:16px;font-weight:700;color:#dffcff;">格林比（Glimbi）</div>
+    <div id="formDesc" class="meta">稀有度：common｜害羞又漂浮的小微生物夥伴。</div>
+  </div>
+  <div id="talk"></div>
+  <div id="status">遊戲已開始</div>
+  <button id="feedBtn" class="fab">🍼</button>
+  <button id="petBtn" class="fab">🫳</button>
+  <button id="eggBtn" class="fab">🥚</button>
+  <button id="tasksBtn" class="fab">📋</button>
+  <button id="codexBtn" class="fab">🧫</button>
+  <button id="settingsBtn" class="fab">⚙️</button>
+  <button id="evolveBtn">⬆️ 升級</button>
+  <div id="settingsPanel" class="panel drawer hidden">
+    <div class="sectionTitle">設定</div>
+    <div class="grid">
+      <button id="musicBtn">音樂：關</button>
+      <button id="pauseBtn">番茄鐘：進行中</button>
+      <button id="styleBtn">風格：Sunny</button>
+      <button id="breakBtn">休息</button>
+      <button id="themeBtn">模式：宇宙</button>
+      <button id="customToggleBtn">自訂時間</button>
+    </div>
+    <div id="customWrap" class="hidden" style="margin-top:10px;">
+      <div class="sectionTitle">自訂番茄鐘</div>
+      <label>專注分鐘</label><input id="focusInput" type="number" min="1" max="180" value="25">
+      <label>休息分鐘</label><input id="breakInput" type="number" min="1" max="60" value="5">
+      <button id="applyCustomBtn">套用</button>
+    </div>
+  </div>
+  <div id="tasksPanel" class="panel drawer hidden">
+    <div class="sectionTitle">成就徽章</div>
+    <div id="badges"></div>
+    <div class="sectionTitle" style="margin-top:10px;">每日任務</div>
+    <div id="tasks"></div>
+  </div>
+  <div id="codexPanel" class="panel drawer hidden">
+    <div class="sectionTitle">細菌圖鑑收集冊</div>
+    <div id="codexSummary" class="meta" style="margin-bottom:10px;">已收集 1 / 12</div>
+    <button id="breedBtn" style="margin-bottom:10px;">🧬 細菌融合</button>
+    <div id="codexList"></div>
+  </div>
+  <div id="reward" class="hidden">
+    <div id="rewardTitle">🎉 獎勵</div>
+    <div id="rewardBody">你完成了一個目標</div>
+    <div id="rewardMeta">+XP +Bond</div>
+    <button id="closeRewardBtn">太好了</button>
+  </div>
+  <div id="unlock">
+    <div id="unlockCard" onclick="window.__startGame && window.__startGame()">
+      <div id="unlockTitle">開始遊戲</div>
+      <div>點一下啟動桌寵、每日登入獎勵與所有互動功能。</div>
+      <button id="unlockBtn" onclick="window.__startGame && window.__startGame()">進入遊戲</button>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const canvas=$('scene'); const ctx=canvas.getContext('2d');
+let W=innerWidth,H=innerHeight,DPR=Math.max(1,devicePixelRatio||1);
+function resize(){W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);} resize(); addEventListener('resize',resize);
+const STORAGE_KEY='study_companion_v16_pro_stable_v2';
+const bacteriaForms=[
+{name:'格林比',eng:'Glimbi',desc:'害羞又漂浮的小微生物夥伴。',personality:'安靜、黏人。',shape:'blob',rarity:'common'},
+{name:'刺波拉',eng:'Spikora',desc:'帶著小尖刺、愛傻笑的孢子球。',personality:'看似兇其實很撒嬌。',shape:'spike',rarity:'common'},
+{name:'麵麵菌',eng:'Noodlix',desc:'開心時會扭來扭去的麵條菌。',personality:'超會亂扭。',shape:'worm',rarity:'common'},
+{name:'絨球球',eng:'Orbifuzz',desc:'毛絨絨、會輕聲哼唱的微球菌。',personality:'最溫柔的一型。',shape:'fuzz',rarity:'common'},
+{name:'黏黏團',eng:'Clumpi',desc:'愛黏人、喜歡摸頭的群落菌。',personality:'超級依戀型。',shape:'cluster',rarity:'rare'},
+{name:'啪滋菌',eng:'Zappule',desc:'帶著靜電與小火花的疾電菌。',personality:'活潑暴衝。',shape:'zap',rarity:'rare'},
+{name:'麻糬黴',eng:'Mochimyte',desc:'軟綿綿、臉頰總是想睡的粉彩菌。',personality:'慢半拍、可愛。',shape:'mochi',rarity:'rare'},
+{name:'觸觸寶',eng:'Tentaboo',desc:'從桌面宇宙來的友善觸手菌。',personality:'神祕但友善。',shape:'tentacle',rarity:'rare'},
+{name:'皺皺隆',eng:'Crinklone',desc:'帶著古老皺摺感的微生物。',personality:'像長老一樣。',shape:'fold',rarity:'legendary'},
+{name:'笑質體',eng:'Giggloplasm',desc:'純粹胡鬧又傳奇的奇怪細菌。',personality:'最怪最鬧。',shape:'legend',rarity:'legendary'},
+{name:'月影菌后',eng:'Noctiluxa',desc:'只在深夜桌面現身的隱藏女王菌。',personality:'安靜、高冷。',shape:'queen',rarity:'hidden'},
+{name:'泡泡神菌',eng:'Bubblion',desc:'傳說中的透明泡泡菌。',personality:'戲劇化、愛演。',shape:'bubble',rarity:'hidden'}
+];
+const styles=[
+{name:'Sunny',body:'#ffd54a',ear:'#ffe17a',halo:'255,224,102',blush:'255,160,185',belly:'255,255,255'},
+{name:'Aqua',body:'#79f2ff',ear:'#9cf8ff',halo:'121,242,255',blush:'255,173,216',belly:'255,255,255'},
+{name:'Dream',body:'#c692ff',ear:'#dab2ff',halo:'198,146,255',blush:'255,180,220',belly:'255,255,255'},
+{name:'Peach',body:'#ffbf8a',ear:'#ffd5b6',halo:'255,191,138',blush:'255,170,170',belly:'255,255,255'}
+];
+const state={hp:92,food:78,energy:86,bond:40,mode:'focus',running:true,seconds:25*60,session:1,focusMinutesSetting:25,breakMinutesSetting:5,todayFocusSeconds:0,completed:0,streak:0,level:1,xp:0,styleIndex:0,formIndex:0,codex:[0],shiny:false,bgmOn:false,theme:0,eggCount:0,lastLogin:''};
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function load(){try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'); if(s) Object.assign(state,s)}catch(e){}}
+function form(){return bacteriaForms[state.formIndex]}
+function styleObj(){return styles[state.styleIndex]}
+function todayKey(){return new Date().toISOString().slice(0,10)}
+function claimDailyReward(){if(state.lastLogin!==todayKey()){state.lastLogin=todayKey();state.eggCount+=1;state.food=Math.min(100,state.food+10);state.energy=Math.min(100,state.energy+10);showReward('🎁 每日登入獎勵','你獲得 1 顆細菌蛋','飽食 +10，能量 +10')}}
+let audioCtx=null; function ensureAudio(){if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume()}
+function tone(freq=660,dur=.16,g=.02){ensureAudio(); const now=audioCtx.currentTime; const o=audioCtx.createOscillator(); const a=audioCtx.createGain(); o.type='triangle'; o.frequency.setValueAtTime(freq,now); a.gain.setValueAtTime(.0001,now); a.gain.exponentialRampToValueAtTime(g,now+.03); a.gain.exponentialRampToValueAtTime(.0001,now+dur); o.connect(a).connect(audioCtx.destination); o.start(now); o.stop(now+dur+.02)}
+function softMeow(){tone(520,.22,.018); setTimeout(()=>tone(760,.16,.014),60)}
+function purrSound(){
+  ensureAudio();
+  const now=audioCtx.currentTime;
+  const osc=audioCtx.createOscillator();
+  const lfo=audioCtx.createOscillator();
+  const lfoGain=audioCtx.createGain();
+  const gain=audioCtx.createGain();
+  const filter=audioCtx.createBiquadFilter();
+  osc.type='sawtooth';
+  osc.frequency.setValueAtTime(95, now);
+  lfo.type='sine';
+  lfo.frequency.setValueAtTime(22, now);
+  lfoGain.gain.setValueAtTime(18, now);
+  filter.type='lowpass';
+  filter.frequency.setValueAtTime(420, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.018, now+0.04);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now+0.7);
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc.frequency);
+  osc.connect(filter);
+  filter.connect(gain).connect(audioCtx.destination);
+  osc.start(now); lfo.start(now);
+  osc.stop(now+0.72); lfo.stop(now+0.72);
+}
+let statusTimer=null,talkTimer=null,lastCute=0;
+function setStatus(t){const s=$('status'); s.textContent=t; s.style.opacity='1'; clearTimeout(statusTimer); statusTimer=setTimeout(()=>s.style.opacity='0',7000)}
+function speak(t){const s=$('talk'); s.textContent=t; s.style.opacity='1'; clearTimeout(talkTimer); talkTimer=setTimeout(()=>s.style.opacity='0',7000)}
+function showReward(t,b,m){$('rewardTitle').textContent=t; $('rewardBody').textContent=b; $('rewardMeta').textContent=m; $('reward').classList.remove('hidden')}
+$('closeRewardBtn').onclick=()=>$('reward').classList.add('hidden');
+function updateUI(){ $('hpBar').style.width=state.hp+'%'; $('foodBar').style.width=state.food+'%'; $('energyBar').style.width=state.energy+'%'; $('bondBar').style.width=state.bond+'%'; $('hpVal').textContent=Math.round(state.hp); $('foodVal').textContent=Math.round(state.food); $('energyVal').textContent=Math.round(state.energy); $('bondVal').textContent=Math.round(state.bond); $('todayFocus').textContent=Math.floor(state.todayFocusSeconds/60)+'m'; $('sessionInfo').textContent=state.completed+' 個番茄鐘完成'; $('streakInfo').textContent='連續 '+state.streak+' 天'; $('xpInfo').textContent='等級 '+state.level+' · XP '+state.xp; $('eggInfo').textContent='細菌蛋：'+state.eggCount+' 顆'; $('timerMode').textContent=state.mode==='focus'?'專注':'休息'; $('timerText').textContent=String(Math.floor(state.seconds/60)).padStart(2,'0')+':'+String(state.seconds%60).padStart(2,'0'); $('timerRound').textContent='第 '+state.session+' 輪'; $('loginInfo').textContent='每日登入：'+(state.lastLogin===todayKey()?'已領取':'未領取'); $('formName').innerHTML=(state.shiny?'✨ ':'')+form().name+'（'+form().eng+'）'; $('formName').className='rarity-'+form().rarity; $('formDesc').textContent='稀有度：'+form().rarity+(state.shiny?' · 彩色變異':'')+'｜'+form().desc+' 個性：'+form().personality; $('musicBtn').textContent='音樂：'+(state.bgmOn?'開':'關'); $('pauseBtn').textContent='番茄鐘：'+(state.running?'進行中':'暫停'); $('styleBtn').textContent='風格：'+styleObj().name; $('themeBtn').textContent='模式：'+['宇宙','極光','夢境'][state.theme]; renderTasks(); renderCodex() }
+function renderTasks(){ const badges=[]; const m=Math.floor(state.todayFocusSeconds/60); if(state.completed>=2) badges.push('雙番茄達成'); if(state.completed>=5) badges.push('五輪專注'); if(m>=180) badges.push('三小時專注'); if(state.streak>=7) badges.push('七日連續'); if(state.level>=5) badges.push('大師夥伴'); if(state.xp>=120) badges.push('深度專注'); if(state.codex.length===12) badges.push('圖鑑大師'); $('badges').innerHTML=(badges.length?badges:['尚未解鎖徽章']).map(b=>`<span class="badge">${b}</span>`).join(''); const tasks=[['完成 2 顆番茄鐘',state.completed>=2],['完成 5 顆番茄鐘',state.completed>=5],['今日專注 180 分鐘',m>=180],['親密度達到 90',state.bond>=90],['收集 12 種細菌',state.codex.length===12]]; $('tasks').innerHTML=tasks.map(([n,d])=>`<div class="task">${d?'✅':'⬜'} ${n}</div>`).join('') }
+function renderCodex(){ $('codexSummary').textContent='已收集 '+state.codex.length+' / 12'; const groups={common:[],rare:[],legendary:[],hidden:[]}; bacteriaForms.forEach((f,i)=>groups[f.rarity].push([f,i])); const section=(title,list)=>`<div class="sectionTitle" style="margin-top:8px;">${title}</div>`+list.map(([f,i])=>state.codex.includes(i)?`<div class="card"><div class="rarity-${f.rarity}">🧫 ${f.name}（${f.eng}）</div><div class="meta">${f.desc} 個性：${f.personality}</div></div>`:`<div class="card" style="opacity:.45;">🔒 未解鎖<div class="meta">尚未解鎖，請繼續升級、孵蛋或融合。</div></div>`).join(''); $('codexList').innerHTML=section('普通細菌',groups.common)+section('稀有細菌',groups.rare)+section('傳奇細菌',groups.legendary)+section('隱藏細菌',groups.hidden) }
+function randomLine(kind){ const lines={normal:['早安，小天才。','一頁一頁來，我在這裡陪你。','小小細菌，大大陪伴。','讓這次讀書閃閃發亮吧。'],pet:['這個摸摸好溫柔……','你的手讓我很安心。','我是一隻被寵壞的小細菌。'],feed:['咔滋咔滋……好吃的分子！','我的菌落非常感謝你。','這份點心科學地可愛。'],egg:['蛋殼裂開了……新的生命誕生！','這顆蛋好像很喜歡你。','孵化完成，準備開始冒險。'],ret:['你回來了，我一直在這裡等你。','歡迎回來，我的讀書夥伴。'],yawn:['哈——欠……我還在陪你。','連細菌也會有點想睡。']}; const arr=lines[kind]||lines.normal; return arr[Math.floor(Math.random()*arr.length)] }
+function addXP(v){ state.xp+=v; while(state.xp>=state.level*60){ state.xp-=state.level*60; state.level+=1; showReward('✨ 升級成功','你的陪讀夥伴升到 等級 '+state.level,'外觀更華麗') } }
+function maybeCuteSound(){ const now=Date.now(); if(now-lastCute>5000 && Math.random()<0.004){ softMeow(); lastCute=now } }
+const pet={x:W/2,y:H*0.67,vx:0,vy:0,t:0,blinkT:0,blink:false,dance:0,evolveFlash:0,petBlink:0,feedHappy:0,pettingAnim:0,feedAnim:0,eggAnim:0,bliss:0,tailWag:0,squish:0};
+const particles=[]; const stars=Array.from({length:140},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()*2.3+.3,v:Math.random()*.35+.03,a:Math.random()*.6+.15}));
+function burst(x,y,symbol,count=16){ for(let i=0;i<count;i++){ const a=Math.random()*Math.PI*2, sp=Math.random()*3+1; particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-.5,life:30+Math.random()*16,max:46,symbol,size:16+Math.random()*10}) } }
+function feedAction(){ state.food=Math.min(100,state.food+18); state.hp=Math.min(100,state.hp+4); state.energy=Math.min(100,state.energy+6); state.bond=Math.min(100,state.bond+3); pet.feedHappy=90; pet.feedAnim=60; burst(pet.x,pet.y-30,'🍪',10); burst(pet.x,pet.y-10,'✨',12); addXP(6); setStatus('餵食時間'); speak(randomLine('feed')); softMeow(); updateUI(); save() }
+function petAction(){ state.bond=Math.min(100,state.bond+8); state.hp=Math.min(100,state.hp+3); state.energy=Math.max(0,state.energy-2); pet.petBlink=60; pet.pettingAnim=92; pet.bliss=120; pet.tailWag=90; pet.squish=95; burst(pet.x,pet.y-25,'❤',14); burst(pet.x,pet.y-10,'⭐',12); addXP(5); setStatus('牠舒服到整隻軟綿綿'); speak('呼嚕……好舒服，再摸摸我。'); purrSound(); updateUI(); save() }
+function rollPool(){ const r=Math.random(); if(r<0.005) return bacteriaForms.filter(b=>b.rarity==='hidden'); if(r<0.08) return bacteriaForms.filter(b=>b.rarity==='legendary'); if(r<0.33) return bacteriaForms.filter(b=>b.rarity==='rare'); return bacteriaForms.filter(b=>b.rarity==='common') }
+function evolveAction(){ state.level+=1; pet.evolveFlash=160; pet.dance=120; const pool=rollPool(); const pick=pool[Math.floor(Math.random()*pool.length)]; state.formIndex=bacteriaForms.indexOf(pick); state.shiny=Math.random()<0.08; if(!state.codex.includes(state.formIndex)) state.codex.push(state.formIndex); burst(pet.x,pet.y-30,'🧫',12); burst(pet.x,pet.y-15,'🌟',22); if(['legendary','hidden'].includes(pick.rarity)) burst(pet.x,pet.y-20,'✨',28); setStatus('升級成功！'); speak('我進化成 '+form().name+' 了！'); showReward('🧫 細菌進化',(state.shiny?'✨ ':'')+form().name+'（稀有度：'+form().rarity+'）',form().desc); tone(920,.18,.03); updateUI(); save() }
+function breedAction(){ if(state.codex.length<2){ setStatus('至少要收集兩種細菌才能融合'); showReward('🧬 無法融合','圖鑑至少要有兩種細菌','請先多升級幾次'); return } const pool=bacteriaForms.filter(b=>['rare','legendary','hidden'].includes(b.rarity)); const pick=pool[Math.floor(Math.random()*pool.length)]; state.formIndex=bacteriaForms.indexOf(pick); if(!state.codex.includes(state.formIndex)) state.codex.push(state.formIndex); state.shiny=Math.random()<0.18; pet.evolveFlash=220; pet.dance=150; burst(pet.x,pet.y-20,'🧬',26); burst(pet.x,pet.y-10,'✨',18); setStatus('融合成功'); speak('我們融合出了新的菌種！'); showReward('🧬 融合進化',(state.shiny?'✨ ':'')+form().name+'（'+form().rarity+'）','兩隻細菌融合出了新的型態'); updateUI(); save() }
+function hatchEggAction(){ if(state.eggCount<=0){ setStatus('沒有細菌蛋了'); showReward('🥚 沒有細菌蛋','請明天登入或完成更多專注','每日登入會送你細菌蛋'); return } state.eggCount-=1; pet.eggAnim=100; pet.evolveFlash=120; const pool=rollPool(); const pick=pool[Math.floor(Math.random()*pool.length)]; state.formIndex=bacteriaForms.indexOf(pick); state.shiny=Math.random()<0.10; if(!state.codex.includes(state.formIndex)) state.codex.push(state.formIndex); burst(pet.x,pet.y-25,'🥚',18); burst(pet.x,pet.y-10,'✨',18); setStatus('孵化成功'); speak(randomLine('egg')); showReward('🥚 細菌蛋孵化',(state.shiny?'✨ ':'')+form().name+' 出現了',form().desc); updateUI(); save() }
+$('feedBtn').onclick=feedAction; $('petBtn').onclick=petAction; $('eggBtn').onclick=hatchEggAction; $('evolveBtn').onclick=evolveAction; $('breedBtn').onclick=breedAction;
+$('settingsBtn').onclick=()=>{ $('settingsPanel').classList.toggle('hidden'); $('tasksPanel').classList.add('hidden'); $('codexPanel').classList.add('hidden') };
+$('tasksBtn').onclick=()=>{ $('tasksPanel').classList.toggle('hidden'); $('settingsPanel').classList.add('hidden'); $('codexPanel').classList.add('hidden') };
+$('codexBtn').onclick=()=>{ $('codexPanel').classList.toggle('hidden'); $('settingsPanel').classList.add('hidden'); $('tasksPanel').classList.add('hidden') };
+$('musicBtn').onclick=()=>{ state.bgmOn=!state.bgmOn; if(state.bgmOn) tone(660,.2,.02); updateUI(); save() };
+$('pauseBtn').onclick=()=>{ state.running=!state.running; setStatus(state.running?'專注計時開始':'番茄鐘已暫停'); updateUI(); save() };
+$('styleBtn').onclick=()=>{ state.styleIndex=(state.styleIndex+1)%styles.length; setStatus('換風格：'+styleObj().name); updateUI(); save() };
+$('breakBtn').onclick=()=>{ state.mode='break'; state.seconds=state.breakMinutesSetting*60; state.running=false; state.energy=Math.min(100,state.energy+8); setStatus('短暫休息一下'); updateUI(); save() };
+$('themeBtn').onclick=()=>{ state.theme=(state.theme+1)%3; updateUI(); save() };
+$('customToggleBtn').onclick=()=>$('customWrap').classList.toggle('hidden');
+$('applyCustomBtn').onclick=()=>{ state.focusMinutesSetting=Math.max(1,Math.min(180,parseInt($('focusInput').value||25))); state.breakMinutesSetting=Math.max(1,Math.min(60,parseInt($('breakInput').value||5))); state.seconds=(state.mode==='focus'?state.focusMinutesSetting:state.breakMinutesSetting)*60; setStatus('已套用自訂番茄鐘'); updateUI(); save() };
+$('closeRewardBtn').onclick=()=>$('reward').classList.add('hidden');
+let awayAt=0; document.addEventListener('visibilitychange',()=>{ if(document.hidden) awayAt=Date.now(); else if(awayAt && Date.now()-awayAt>15000){ speak(randomLine('ret')); setStatus('歡迎回來'); awayAt=0 } });
+setInterval(()=>{ if(!state.running) return; state.seconds--; if(state.mode==='focus'){ state.todayFocusSeconds+=1; if(state.seconds%30===0) addXP(1); if(state.seconds===60){ setStatus('剩下 1 分鐘，加油'); tone(720,.14,.02) } if(state.seconds===10){ setStatus('10 秒後完成這輪專注'); tone(920,.16,.03) } } if(state.seconds<=0){ if(state.mode==='focus'){ state.mode='break'; state.seconds=state.breakMinutesSetting*60; state.completed+=1; state.bond=Math.min(100,state.bond+10); state.energy=Math.min(100,state.energy+8); state.streak=Math.max(1,state.streak); addXP(20); pet.dance=120; burst(pet.x,pet.y-25,'🎉',24); setStatus('太棒了，你完成一個番茄鐘'); speak('你做得超棒。'); showReward('🎉 任務完成','太棒了，你完成一個番茄鐘','+'+state.focusMinutesSetting+' 分鐘專注 · +XP · +Bond') } else { state.mode='focus'; state.seconds=state.focusMinutesSetting*60; state.session+=1; setStatus('休息結束，回到專注'); speak(randomLine('ret')) } updateUI(); save() } },1000);
+let pointer={x:W/2,y:H/2,active:false}; let lastPetTouch=0;
+function maybePetFromPointer(x,y){
+  const now=Date.now();
+  const dx=x-pet.x, dy=y-pet.y;
+  if(Math.hypot(dx,dy)<118 && now-lastPetTouch>700){
+    lastPetTouch=now;
+    petAction();
+  }
+}
+addEventListener('mousemove',e=>{ pointer.x=e.clientX; pointer.y=e.clientY; pointer.active=true; maybePetFromPointer(pointer.x,pointer.y); });
+addEventListener('touchstart',e=>{ if(e.touches[0]){ pointer.x=e.touches[0].clientX; pointer.y=e.touches[0].clientY; pointer.active=true; maybePetFromPointer(pointer.x,pointer.y); } },{passive:true});
+addEventListener('touchmove',e=>{ if(e.touches[0]){ pointer.x=e.touches[0].clientX; pointer.y=e.touches[0].clientY; pointer.active=true; maybePetFromPointer(pointer.x,pointer.y); } },{passive:true});
+function drawBg(){ const g=ctx.createLinearGradient(0,0,0,H); const modes=[['rgba(10,16,40,0.32)','rgba(18,8,28,0.22)'],['rgba(8,30,40,0.30)','rgba(20,8,32,0.20)'],['rgba(28,16,40,0.30)','rgba(8,18,32,0.20)']]; g.addColorStop(0,modes[state.theme][0]); g.addColorStop(1,modes[state.theme][1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); for(const s of stars){ s.y+=s.v; if(s.y>H) s.y=-2; ctx.fillStyle='rgba(255,255,255,'+s.a+')'; ctx.beginPath(); ctx.arc(s.x,s.y,s.s,0,Math.PI*2); ctx.fill() } }
+function drawShadow(x,y,size){ ctx.save(); ctx.fillStyle='rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(x,y+size*0.62,size*0.42,size*0.14,0,0,Math.PI*2); ctx.fill(); ctx.restore() }
+function drawFace(expr,eyeDX,eyeDY){ ctx.strokeStyle='#1c1f28'; ctx.fillStyle='#1c1f28'; const blinkNow=pet.blink||pet.petBlink>0||pet.feedHappy>0||pet.eggAnim>0||pet.bliss>0; if(blinkNow){ ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-22,-10); ctx.quadraticCurveTo(-14,-18,-6,-10); ctx.moveTo(6,-10); ctx.quadraticCurveTo(14,-18,22,-10); ctx.stroke(); if(pet.bliss>0){ ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-24,-15); ctx.quadraticCurveTo(-14,-22,-4,-15); ctx.moveTo(4,-15); ctx.quadraticCurveTo(14,-22,24,-15); ctx.stroke(); } } else if(expr==='sleepy'){ ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-22,-10); ctx.quadraticCurveTo(-14,-15,-6,-10); ctx.moveTo(6,-10); ctx.quadraticCurveTo(14,-15,22,-10); ctx.stroke() } else { ctx.beginPath(); ctx.arc(-14,-10,10,0,Math.PI*2); ctx.arc(14,-10,10,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.arc(-14+eyeDX*0.35,-10+eyeDY*0.35,4,0,Math.PI*2); ctx.arc(14+eyeDX*0.35,-10+eyeDY*0.35,4,0,Math.PI*2); ctx.fill() } ctx.strokeStyle='#1c1f28'; ctx.lineWidth=4; ctx.beginPath(); if(pet.bliss>0){ ctx.arc(0,8,30,0,Math.PI); } else if(pet.feedHappy>0||pet.eggAnim>0) ctx.arc(0,10,24,0,Math.PI); else if(expr==='focus') ctx.arc(0,18,14,0,Math.PI); else if(expr==='celebrate') ctx.arc(0,12,24,0,Math.PI); else if(expr==='love') ctx.arc(0,14,22,0,Math.PI); else if(expr==='sleepy') ctx.arc(0,20,12,0,Math.PI); else ctx.arc(0,16,18,0,Math.PI); ctx.stroke(); if(expr==='love'){ ctx.font='18px Arial'; ctx.fillText('❤',-18,-8); ctx.fillText('❤',6,-8) } }
+function drawPet(){ pet.t+=0.035; pet.blinkT+=0.025; if(pet.blinkT>5.2){ pet.blink=true; if(pet.blinkT>5.42){ pet.blink=false; pet.blinkT=0 } } const idleX=W/2,idleY=H*0.67,targetX=pointer.active?(idleX+(pointer.x-idleX)*0.12):idleX,targetY=pointer.active?(idleY+(pointer.y-idleY)*0.04):idleY; const dx=targetX-pet.x, dy=targetY-pet.y; pet.vx+=dx*0.0011; pet.vy+=dy*0.0009; pet.vx*=0.92; pet.vy*=0.92; pet.x+=pet.vx; pet.y+=pet.vy; if(pet.dance>0) pet.dance--; if(pet.evolveFlash>0) pet.evolveFlash--; if(pet.petBlink>0) pet.petBlink--; if(pet.feedHappy>0) pet.feedHappy--; if(pet.pettingAnim>0) pet.pettingAnim--; if(pet.feedAnim>0) pet.feedAnim--; if(pet.eggAnim>0) pet.eggAnim--; if(pet.bliss>0) pet.bliss--; if(pet.tailWag>0) pet.tailWag--; if(pet.squish>0) pet.squish--; const bob=Math.sin(pet.t*2.6)*8+(pet.dance>0?Math.sin(pet.t*12)*10:0)+(pet.pettingAnim>0?Math.sin(pet.t*18)*6:0)+(pet.eggAnim>0?Math.sin(pet.t*20)*8:0)+(pet.bliss>0?Math.sin(pet.t*16)*4:0); const breathe=1+Math.sin(pet.t*2)*0.02+(pet.feedAnim>0?0.04:0); const squishX=1+(pet.squish>0?0.08*Math.sin(pet.t*14):0); const squishY=1-(pet.squish>0?0.06*Math.sin(pet.t*14):0); const tilt=Math.max(-0.16,Math.min(0.16,dx*0.00035))+(pet.dance>0?Math.sin(pet.t*10)*0.08:0)+(pet.pettingAnim>0?Math.sin(pet.t*14)*0.05:0); const eyeDX=Math.max(-4,Math.min(4,dx*0.018)), eyeDY=Math.max(-3,Math.min(3,dy*0.016)); const expr=pet.dance>0?'celebrate':(state.running&&state.mode==='focus'&&state.energy<28?'sleepy':(state.bond>80?'love':(state.running&&state.mode==='focus'?'focus':'happy'))); drawShadow(pet.x,pet.y+bob,136); ctx.save(); ctx.translate(pet.x,pet.y+bob); ctx.rotate(tilt); ctx.scale(breathe*squishX,breathe*squishY); const st=styleObj(); const halo=ctx.createRadialGradient(0,0,18,0,0,126+state.level*6); halo.addColorStop(0,'rgba(255,255,255,0.18)'); halo.addColorStop(.3,'rgba('+st.halo+',0.20)'); halo.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(0,0,126+state.level*6,0,Math.PI*2); ctx.fill(); if(pet.evolveFlash>0){ ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(0,0,88+Math.sin(pet.t*10)*6,0,Math.PI*2); ctx.stroke() } if(state.shiny){ for(let i=0;i<6;i++){ const a=pet.t*2+i*1.05; ctx.fillStyle='rgba(255,255,255,.95)'; ctx.beginPath(); ctx.arc(Math.cos(a)*82,Math.sin(a)*82,3,0,Math.PI*2); ctx.fill() } } const f=form(); ctx.fillStyle=st.ear; if(f.shape==='blob'){ ctx.beginPath(); ctx.ellipse(-34,-60,16,24,-0.2,0,Math.PI*2); ctx.ellipse(34,-60,16,24,0.2,0,Math.PI*2); ctx.fill(); ctx.fillStyle=st.body; ctx.beginPath(); ctx.arc(0,0,58,0,Math.PI*2); ctx.fill() } else if(f.shape==='spike'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.arc(0,0,52,0,Math.PI*2); ctx.fill(); for(let i=0;i<10;i++){ const a=i*Math.PI*2/10; ctx.beginPath(); ctx.moveTo(Math.cos(a)*40,Math.sin(a)*40); ctx.lineTo(Math.cos(a)*68,Math.sin(a)*68); ctx.lineTo(Math.cos(a+0.18)*42,Math.sin(a+0.18)*42); ctx.fill() } } else if(f.shape==='worm'){ ctx.fillStyle=st.body; for(let i=0;i<5;i++){ ctx.beginPath(); ctx.ellipse(-40+i*20,Math.sin(pet.t*4+i)*5,18,16,0,0,Math.PI*2); ctx.fill() } } else if(f.shape==='fuzz'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.arc(0,0,54,0,Math.PI*2); ctx.fill(); for(let i=0;i<18;i++){ const a=i*Math.PI*2/18; ctx.beginPath(); ctx.arc(Math.cos(a)*62,Math.sin(a)*62,6,0,Math.PI*2); ctx.fill() } } else if(f.shape==='cluster'){ ctx.fillStyle=st.body; [[0,0],[-32,-10],[30,-8],[-18,28],[24,26]].forEach(p=>{ ctx.beginPath(); ctx.arc(p[0],p[1],26,0,Math.PI*2); ctx.fill() }) } else if(f.shape==='zap'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.moveTo(-48,-36); ctx.lineTo(-8,-36); ctx.lineTo(-20,0); ctx.lineTo(28,0); ctx.lineTo(4,42); ctx.lineTo(14,12); ctx.lineTo(-48,12); ctx.closePath(); ctx.fill() } else if(f.shape==='mochi'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.moveTo(-58,-10); ctx.bezierCurveTo(-60,-54,60,-54,58,-10); ctx.bezierCurveTo(54,56,-54,56,-58,-10); ctx.fill() } else if(f.shape==='tentacle'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.arc(0,-6,46,0,Math.PI*2); ctx.fill(); for(let i=0;i<6;i++){ ctx.beginPath(); ctx.moveTo(-38+i*15,20); ctx.quadraticCurveTo(-44+i*16,54+Math.sin(pet.t*4+i)*10,-30+i*16,72); ctx.lineWidth=10; ctx.strokeStyle=st.body; ctx.stroke() } } else if(f.shape==='fold'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.ellipse(0,0,60,48,0,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=3; for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(-40,i*12); ctx.quadraticCurveTo(0,i*18,40,i*12); ctx.stroke() } } else if(f.shape==='queen'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.ellipse(0,0,56,44,0,0,Math.PI*2); ctx.fill(); for(let i=0;i<8;i++){ const a=i*Math.PI*2/8; ctx.beginPath(); ctx.ellipse(Math.cos(a)*62,Math.sin(a)*62,12,8,a,0,Math.PI*2); ctx.fill() } ctx.fillStyle='rgba(255,255,255,.35)'; ctx.beginPath(); ctx.moveTo(0,-76); ctx.lineTo(-18,-46); ctx.lineTo(18,-46); ctx.closePath(); ctx.fill() } else if(f.shape==='bubble'){ ctx.fillStyle=st.body; ctx.beginPath(); ctx.arc(0,0,40,0,Math.PI*2); ctx.fill(); [[-46,-20,18],[44,-12,16],[-28,42,14],[30,38,12],[0,-54,15]].forEach(p=>{ ctx.beginPath(); ctx.arc(p[0],p[1],p[2],0,Math.PI*2); ctx.fill() }) } else { ctx.fillStyle=st.body; ctx.beginPath(); ctx.arc(0,0,42,0,Math.PI*2); ctx.fill(); for(let i=0;i<7;i++){ const a=i*Math.PI*2/7; ctx.beginPath(); ctx.ellipse(Math.cos(a)*58,Math.sin(a)*58,16,12,a,0,Math.PI*2); ctx.fill() } } ctx.fillStyle='rgba('+st.belly+',0.74)'; ctx.beginPath(); ctx.ellipse(0,16,28,22,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba('+st.blush+',0.72)'; ctx.beginPath(); ctx.arc(-28,6,9,0,Math.PI*2); ctx.arc(28,6,9,0,Math.PI*2); ctx.fill(); if(pet.bliss>0){ ctx.fillStyle='rgba(255,170,200,.95)'; ctx.beginPath(); ctx.arc(-30,4,13,0,Math.PI*2); ctx.arc(30,4,13,0,Math.PI*2); ctx.fill(); ctx.font='18px Arial'; ctx.fillText('❤',-14,-40); ctx.fillText('❤',10,-50); ctx.fillText('❤',22,-30); } drawFace(expr,eyeDX,eyeDY); ctx.restore() }
+function drawParticles(){ for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vx*=0.985; p.vy*=0.988; p.vy+=0.01; p.life-=1; if(p.life<=0){ particles.splice(i,1); continue } const a=p.life/p.max; ctx.save(); ctx.globalAlpha=a; ctx.font=p.size+'px Arial'; ctx.fillText(p.symbol,p.x,p.y); ctx.restore() } }
+function loop(){ requestAnimationFrame(loop); ctx.clearRect(0,0,W,H); drawBg(); maybeCuteSound(); if(Math.random()<0.0007){ pet.petBlink=24; speak(randomLine('yawn')) } drawPet(); drawParticles(); updateUI() }
+window.__startGame = function(){
+  try{ ensureAudio(); }catch(e){}
+  try{ claimDailyReward(); }catch(e){}
+  try{
+    const u = $('unlock');
+    if(u){
+      u.style.opacity = '0';
+      u.style.pointerEvents = 'none';
+      setTimeout(()=>{ u.style.display = 'none'; }, 180);
+    }
+  }catch(e){}
+  try{ setStatus('遊戲已開始'); }catch(e){}
+  try{ speak('桌面小細菌已經準備好了。'); }catch(e){}
+  try{ updateUI(); save(); }catch(e){}
+};
+$('unlockBtn').onclick = window.__startGame;
+load(); $('focusInput').value=state.focusMinutesSetting; $('breakInput').value=state.breakMinutesSetting; updateUI(); loop();
+</script>
+</body>
+</html>
